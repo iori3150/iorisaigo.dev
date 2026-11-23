@@ -1,0 +1,134 @@
+---
+// 図 4：半径グラフ上のメッセージパッシングで、M 段のあいだに情報が届く範囲
+import { ui, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+	initial?: number;
+}
+const { lang = 'ja', initial = 3 } = Astro.props;
+const t = ui[lang];
+---
+
+<div class="lm-reach" data-t={JSON.stringify(t)} data-initial={initial}>
+	<svg viewBox="0 0 720 340" style="overflow: hidden" role="img" aria-label={lang === 'ja' ? '近傍グラフで情報が届く範囲' : 'Reach of message passing on a neighbor graph'}></svg>
+	<div class="lm-controls">
+		<button type="button" class="lm-btn" data-play>{t.play}</button>
+		<label>{t.hops} M<input type="range" min="0" value={initial} step="1" data-m /><output data-m-out>{initial}</output></label>
+		<span class="lm-readout">{t.reached}<b data-count></b></span>
+		<span class="lm-readout">{t.allReached}<b data-max></b></span>
+	</div>
+</div>
+
+<script>
+	const NS = 'http://www.w3.org/2000/svg';
+	const el = (name: string, attrs: Record<string, string | number>, parent?: Element) => {
+		const e = document.createElementNS(NS, name);
+		for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+		parent?.appendChild(e);
+		return e;
+	};
+
+	// 点の配置：格子を乱数（種を固定）でずらす。辺は距離 R 以内
+	function mulberry32(seed: number) {
+		let a = seed;
+		return () => {
+			a = (a + 0x6d2b79f5) | 0;
+			let t = Math.imul(a ^ (a >>> 15), 1 | a);
+			t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+			return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+		};
+	}
+	const rnd = mulberry32(3);
+	const COLS = 17, ROWS = 8, GAP = 40, R = 58;
+	const pts: { x: number; y: number }[] = [];
+	for (let j = 0; j < ROWS; j++)
+		for (let i = 0; i < COLS; i++) pts.push({ x: 40 + i * GAP + (rnd() - 0.5) * 24, y: 20 + j * GAP + (rnd() - 0.5) * 24 });
+	const edges: [number, number][] = [];
+	const adj: number[][] = pts.map(() => []);
+	for (let a = 0; a < pts.length; a++)
+		for (let b = a + 1; b < pts.length; b++)
+			if (Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y) <= R) {
+				edges.push([a, b]);
+				adj[a].push(b);
+				adj[b].push(a);
+			}
+	const src = pts.reduce((best, p, i) => (Math.hypot(p.x - 40, p.y - 160) < Math.hypot(pts[best].x - 40, pts[best].y - 160) ? i : best), 0);
+	const hop = pts.map(() => Infinity);
+	hop[src] = 0;
+	const queue = [src];
+	while (queue.length) {
+		const a = queue.shift()!;
+		for (const b of adj[a]) if (hop[b] === Infinity) { hop[b] = hop[a] + 1; queue.push(b); }
+	}
+	const maxHop = Math.max(...hop.filter(Number.isFinite));
+	const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	for (const root of document.querySelectorAll<HTMLElement>('.lm-reach')) {
+		const svg = root.querySelector('svg')!;
+		const slider = root.querySelector<HTMLInputElement>('[data-m]')!;
+		const out = root.querySelector('[data-m-out]')!;
+		const count = root.querySelector('[data-count]')!;
+		root.querySelector('[data-max]')!.textContent = String(maxHop);
+		const playBtn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+		const t = JSON.parse(root.dataset.t!);
+		slider.max = String(maxHop);
+
+		const ring = el('circle', { cx: pts[src].x, cy: pts[src].y, fill: 'none', stroke: '#2350d8', 'stroke-dasharray': '5 4', 'stroke-width': 1.25 }, svg);
+		const ringLabel = el('text', { 'font-size': 12, fill: '#2350d8' }, svg);
+		const edgeEls = edges.map(([a, b]) => el('line', { x1: pts[a].x, y1: pts[a].y, x2: pts[b].x, y2: pts[b].y }, svg));
+		const dotEls = pts.map((p) => el('circle', { cx: p.x, cy: p.y, r: 5 }, svg));
+		// 半径 R の目盛り
+		el('line', { x1: 640, x2: 640 + R, y1: 330, y2: 330, stroke: '#15233d', 'stroke-width': 1.5 }, svg);
+		const rl = el('text', { x: 640 + R / 2, y: 324, 'font-size': 12, fill: '#15233d', 'text-anchor': 'middle', 'font-style': 'italic' }, svg);
+		rl.textContent = 'r';
+
+		const draw = (m: number) => {
+			edges.forEach(([a, b], i) => {
+				const on = hop[a] <= m && hop[b] <= m && Math.abs(hop[a] - hop[b]) === 1;
+				edgeEls[i].setAttribute('stroke', on ? '#2350d8' : '#d9e0e6');
+				edgeEls[i].setAttribute('stroke-width', on ? '1.5' : '1');
+			});
+			pts.forEach((_, i) => {
+				const h = hop[i];
+				const d = dotEls[i];
+				if (i === src) {
+					d.setAttribute('fill', '#15233d'); d.setAttribute('r', '7'); d.setAttribute('stroke', 'none');
+				} else if (h <= m) {
+					d.setAttribute('fill', h === m ? '#2350d8' : '#7f9ae8');
+					d.setAttribute('r', '5'); d.setAttribute('stroke', 'none');
+				} else {
+					d.setAttribute('fill', '#fff'); d.setAttribute('r', '4.5'); d.setAttribute('stroke', '#8c99a6');
+				}
+			});
+			ring.setAttribute('r', String(m * R));
+			ring.setAttribute('visibility', m > 0 ? 'visible' : 'hidden');
+			ringLabel.textContent = m > 0 ? `${m}r` : '';
+			const ang = -0.5;
+			ringLabel.setAttribute('x', String(pts[src].x + m * R * Math.cos(ang) + 4));
+			ringLabel.setAttribute('y', String(pts[src].y + m * R * Math.sin(ang) - 4));
+			const n = hop.filter((h) => h <= m).length;
+			count.textContent = `${n} / ${pts.length}`;
+			slider.value = String(m);
+			out.textContent = String(m);
+		};
+
+		let timer = 0;
+		const stop = () => { clearInterval(timer); timer = 0; playBtn.textContent = t.play; };
+		playBtn.addEventListener('click', () => {
+			if (timer) return stop();
+			let m = +slider.value >= maxHop ? 0 : +slider.value;
+			draw(m);
+			playBtn.textContent = t.pause;
+			// 段の進みを数えられるよう、1 段ずつ止めて進める
+			timer = window.setInterval(() => {
+				m += 1;
+				draw(m);
+				if (m >= maxHop) stop();
+			}, reduce ? 1200 : 600);
+		});
+		slider.addEventListener('input', () => { stop(); draw(+slider.value); });
+		const init = new URLSearchParams(location.search).get('m');
+		draw(init !== null ? +init : +root.dataset.initial!);
+	}
+</script>

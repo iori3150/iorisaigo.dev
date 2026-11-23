@@ -1,0 +1,122 @@
+---
+// 図 5：全点の注意と近傍だけのメッセージパッシングで、計算する組の数を比べる（式どおりの値）
+// 注意 1 層: N^2。メッセージパッシング 1 段: N k。
+// 端まで届かせる段数: 単位正方形に一様に並んだ N 点で、平均の近傍数 k の半径は r = sqrt(k / (π N))、
+// 一辺を横切るホップ数は 1 / r = sqrt(π N / k)。よって N k sqrt(π N / k)
+import { ui, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+}
+const { lang = 'ja' } = Astro.props;
+const t = ui[lang];
+---
+
+<div class="lm-cost" data-t={JSON.stringify(t)}>
+	<div class="lm-legend">
+		<span style="--c: var(--lm-s2)">{t.costAttn}　N²</span>
+		<span style="--c: var(--lm-s1)">{t.costMp}　Nk</span>
+		<span style="--c: var(--lm-s3)" class="dash">{t.costMpReach}　Nk√(πN/k)</span>
+	</div>
+	<svg viewBox="0 0 720 330" role="img" aria-label={t.pairs}></svg>
+	<div class="lm-controls">
+		<label>{t.points} N<input type="range" min="2" max="6" step="0.05" value="5" data-n /><output data-n-out></output></label>
+		<label>{t.neighbors} k<input type="range" min="3" max="6" step="1" value="5" data-k /><output data-k-out></output></label>
+	</div>
+	<div class="lm-readout" data-values></div>
+</div>
+
+<script>
+	const NS = 'http://www.w3.org/2000/svg';
+	const el = (name: string, attrs: Record<string, string | number>, parent?: Element) => {
+		const e = document.createElementNS(NS, name);
+		for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+		parent?.appendChild(e);
+		return e;
+	};
+	const sup = (n: number) => String(n).replace(/-/g, '⁻').replace(/\d/g, (d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+d]);
+	const sci = (v: number) => {
+		const e = Math.floor(Math.log10(v));
+		const m = v / 10 ** e;
+		return e < 4 ? Math.round(v).toLocaleString('en-US') : `${m.toFixed(1)}×10${sup(e)}`;
+	};
+
+	const series = [
+		{ key: 'costAttn', color: '#c4581c', dash: '', f: (n: number, _k: number) => n * n },
+		{ key: 'costMp', color: '#2350d8', dash: '', f: (n: number, k: number) => n * k },
+		{ key: 'costMpReach', color: '#16866a', dash: '6 4', f: (n: number, k: number) => n * k * Math.sqrt((Math.PI * n) / k) },
+	];
+
+	for (const root of document.querySelectorAll<HTMLElement>('.lm-cost')) {
+		const t = JSON.parse(root.dataset.t!);
+		const svg = root.querySelector('svg')!;
+		const nIn = root.querySelector<HTMLInputElement>('[data-n]')!;
+		const kIn = root.querySelector<HTMLInputElement>('[data-k]')!;
+		const params = new URLSearchParams(location.search);
+		if (params.get('n')) nIn.value = params.get('n')!;
+
+		const x0 = 70, x1 = 690, y0 = 14, y1 = 290;
+		const lx0 = 2, lx1 = 6, ly0 = 2, ly1 = 12;
+		const sx = (n: number) => x0 + ((Math.log10(n) - lx0) / (lx1 - lx0)) * (x1 - x0);
+		const sy = (v: number) => y1 - ((Math.log10(v) - ly0) / (ly1 - ly0)) * (y1 - y0);
+		const text = (x: number, y: number, s: string, anchor = 'end', fill = '#5c6b7c') => {
+			const e = el('text', { x, y, 'font-size': 11.5, fill, 'text-anchor': anchor }, svg);
+			e.textContent = s;
+			return e;
+		};
+		for (let p = ly0; p <= ly1; p += 2) {
+			el('line', { x1: x0, x2: x1, y1: sy(10 ** p), y2: sy(10 ** p), stroke: p === ly0 ? '#8c99a6' : '#ebeff2' }, svg);
+			text(x0 - 8, sy(10 ** p) + 4, `10${sup(p)}`);
+		}
+		for (let p = lx0; p <= lx1; p++) text(sx(10 ** p), y1 + 18, `10${sup(p)}`, 'middle');
+		text(x1, y1 + 36, `${t.points} N`, 'end');
+		text(x0, y0 - 2, t.pairs, 'start');
+
+		const lines = series.map((s) => el('polyline', { fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-dasharray': s.dash }, svg));
+		const cursor = el('line', { y1: y0, y2: y1, stroke: '#8c99a6', 'stroke-dasharray': '3 3' }, svg);
+		const marks = series.map((s) => el('circle', { r: 5, fill: s.color, stroke: '#fff', 'stroke-width': 2 }, svg));
+		const values = root.querySelector('[data-values]')!;
+
+		const draw = () => {
+			const n = 10 ** +nIn.value;
+			const k = 2 ** +kIn.value;
+			root.querySelector('[data-n-out]')!.textContent = sci(n);
+			root.querySelector('[data-k-out]')!.textContent = String(k);
+			series.forEach((s, i) => {
+				const ps: string[] = [];
+				for (let e = lx0; e <= lx1 + 1e-9; e += 0.05) ps.push(`${sx(10 ** e).toFixed(1)},${sy(s.f(10 ** e, k)).toFixed(1)}`);
+				lines[i].setAttribute('points', ps.join(' '));
+				marks[i].setAttribute('cx', String(sx(n)));
+				marks[i].setAttribute('cy', String(sy(s.f(n, k))));
+			});
+			cursor.setAttribute('x1', String(sx(n)));
+			cursor.setAttribute('x2', String(sx(n)));
+			values.replaceChildren(
+				...series.map((s) => {
+					const span = document.createElement('span');
+					span.style.setProperty('--c', s.color);
+					span.className = 'lm-val';
+					const b = document.createElement('b');
+					b.textContent = sci(s.f(n, k));
+					span.append(t[s.key] + ' ', b);
+					return span;
+				}),
+			);
+		};
+		nIn.addEventListener('input', draw);
+		kIn.addEventListener('input', draw);
+		draw();
+	}
+</script>
+
+<style>
+	.lm-cost :global(.lm-val)::before {
+		content: '';
+		display: inline-block;
+		width: 0.6rem;
+		height: 0.6rem;
+		border-radius: 50%;
+		background: var(--c);
+		margin-right: 0.35rem;
+	}
+</style>
