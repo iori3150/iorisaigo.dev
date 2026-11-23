@@ -1,0 +1,153 @@
+---
+// 図 2：ロールアウトで誤差が積み重なる様子を、振り子の小さな実計算で見せる
+import { ui, type Lang } from './strings';
+import { STEPS } from './rollout-calc';
+
+interface Props {
+	lang?: Lang;
+}
+const { lang = 'ja' } = Astro.props;
+const t = ui[lang];
+---
+
+<div class="lm-rollout" data-lang={lang} data-t={JSON.stringify(t)}>
+	<div class="lm-legend">
+		<span style="--c: #15233d">{t.truth}</span>
+		<span style="--c: #2350d8">{t.model}</span>
+	</div>
+	<svg viewBox="0 0 720 340" role="img" aria-label={`${t.truth} / ${t.model}`}></svg>
+	<div class="lm-controls">
+		<button type="button" class="lm-btn" data-play>{t.play}</button>
+		<label>{t.step}<input type="range" min="0" max={STEPS} step="1" value={STEPS} data-step /><output data-step-out>{STEPS}</output></label>
+		<span class="lm-readout">{t.error}<b data-err></b></span>
+	</div>
+</div>
+
+<script>
+	import { computeRollout, STEPS } from './rollout-calc';
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const el = (name: string, attrs: Record<string, string | number>, parent?: Element) => {
+		const e = document.createElementNS(NS, name);
+		for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+		parent?.appendChild(e);
+		return e;
+	};
+	const sup = (n: number) => String(n).replace(/-/g, '⁻').replace(/\d/g, (d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+d]);
+	const fmt = (v: number) => (v === 0 ? '0' : v >= 0.01 ? v.toFixed(3) : v.toExponential(1).replace(/e([+-]\d+)/, (_, e) => `×10${sup(+e)}`));
+
+	const data = computeRollout();
+	const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	for (const root of document.querySelectorAll<HTMLElement>('.lm-rollout')) {
+		const t = JSON.parse(root.dataset.t!);
+		const svg = root.querySelector('svg')!;
+		const slider = root.querySelector<HTMLInputElement>('[data-step]')!;
+		const out = root.querySelector('[data-step-out]')!;
+		const errOut = root.querySelector('[data-err]')!;
+		const playBtn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+
+		// 左：振り子
+		const piv = { x: 110, y: 70 };
+		const L = 110;
+		el('line', { x1: piv.x - 60, y1: piv.y, x2: piv.x + 60, y2: piv.y, stroke: '#8c99a6' }, svg);
+		const rodT = el('line', { stroke: '#15233d', 'stroke-width': 1.5 }, svg);
+		const rodM = el('line', { stroke: '#2350d8', 'stroke-width': 1.5 }, svg);
+		const bobT = el('circle', { r: 11, fill: '#15233d' }, svg);
+		const bobM = el('circle', { r: 11, fill: '#fff', stroke: '#2350d8', 'stroke-width': 2.5 }, svg);
+
+		// 右上：角度、右下：ずれ（対数）
+		const x0 = 250, x1 = 700;
+		const top = { y0: 20, y1: 150 };
+		const bot = { y0: 210, y1: 310 };
+		const sx = (k: number) => x0 + ((x1 - x0) * k) / STEPS;
+		const syTop = (q: number) => top.y0 + ((1.2 - q) / 2.4) * (top.y1 - top.y0);
+		const lmin = -4, lmax = 0;
+		const syBot = (e: number) => bot.y1 - ((Math.log10(Math.max(e, 1e-4)) - lmin) / (lmax - lmin)) * (bot.y1 - bot.y0);
+
+		const axisText = (x: number, y: number, s: string, anchor = 'end') => {
+			const e = el('text', { x, y, 'font-size': 11, fill: '#5c6b7c', 'text-anchor': anchor }, svg);
+			e.textContent = s;
+		};
+		for (const q of [-1, 0, 1]) {
+			el('line', { x1: x0, x2: x1, y1: syTop(q), y2: syTop(q), stroke: q === 0 ? '#c9d1d9' : '#ebeff2' }, svg);
+			axisText(x0 - 6, syTop(q) + 4, String(q));
+		}
+		axisText(x0, top.y0 - 10, `${t.angle} q（rad）`, 'start');
+		for (let p = lmin; p <= lmax; p++) {
+			el('line', { x1: x0, x2: x1, y1: syBot(10 ** p), y2: syBot(10 ** p), stroke: '#ebeff2' }, svg);
+			axisText(x0 - 6, syBot(10 ** p) + 4, p === 0 ? '1' : `10${sup(p)}`);
+		}
+		axisText(x0, bot.y0 - 16, t.error, 'start');
+		for (const k of [0, 100, 200, 300, 400]) axisText(sx(k), bot.y1 + 18, String(k), 'middle');
+		axisText(x1, bot.y1 + 36, t.step, 'end');
+
+		const lineT = el('polyline', { fill: 'none', stroke: '#15233d', 'stroke-width': 1.5 }, svg);
+		const lineM = el('polyline', { fill: 'none', stroke: '#2350d8', 'stroke-width': 2 }, svg);
+		const lineE = el('polyline', { fill: 'none', stroke: '#2350d8', 'stroke-width': 2 }, svg);
+		const cursor = el('line', { y1: top.y0, y2: bot.y1, stroke: '#8c99a6', 'stroke-dasharray': '3 3' }, svg);
+
+		const pts = (k: number, fn: (i: number) => [number, number]) =>
+			Array.from({ length: k + 1 }, (_, i) => fn(i).map((v) => v.toFixed(1)).join(',')).join(' ');
+
+		const draw = (k: number) => {
+			const [qT] = data.truth[k];
+			const [qM] = data.learned[k];
+			const bt = { x: piv.x + L * Math.sin(qT), y: piv.y + L * Math.cos(qT) };
+			const bm = { x: piv.x + L * Math.sin(qM), y: piv.y + L * Math.cos(qM) };
+			for (const [rod, b] of [[rodT, bt], [rodM, bm]] as const) {
+				rod.setAttribute('x1', String(piv.x)); rod.setAttribute('y1', String(piv.y));
+				rod.setAttribute('x2', String(b.x)); rod.setAttribute('y2', String(b.y));
+			}
+			bobT.setAttribute('cx', String(bt.x)); bobT.setAttribute('cy', String(bt.y));
+			bobM.setAttribute('cx', String(bm.x)); bobM.setAttribute('cy', String(bm.y));
+			lineT.setAttribute('points', pts(k, (i) => [sx(i), syTop(data.truth[i][0])]));
+			lineM.setAttribute('points', pts(k, (i) => [sx(i), syTop(data.learned[i][0])]));
+			lineE.setAttribute('points', k < 1 ? '' : pts(k - 1, (i) => [sx(i + 1), syBot(data.error[i + 1])]));
+			cursor.setAttribute('x1', String(sx(k))); cursor.setAttribute('x2', String(sx(k)));
+			slider.value = String(k);
+			out.textContent = String(k);
+			errOut.textContent = fmt(data.error[k]);
+		};
+
+		let raf = 0;
+		let k = STEPS;
+		const stop = () => {
+			cancelAnimationFrame(raf);
+			raf = 0;
+			playBtn.textContent = t.play;
+		};
+		const play = () => {
+			if (k >= STEPS) k = 0;
+			playBtn.textContent = t.pause;
+			let last = performance.now();
+			const tick = (now: number) => {
+				// 1 秒に 120 ステップ進める
+				k = Math.min(STEPS, k + Math.max(1, Math.round(((now - last) / 1000) * 120)));
+				last = now;
+				draw(k);
+				if (k < STEPS) raf = requestAnimationFrame(tick);
+				else stop();
+			};
+			raf = requestAnimationFrame(tick);
+		};
+		playBtn.addEventListener('click', () => (raf ? stop() : play()));
+		slider.addEventListener('input', () => {
+			stop();
+			k = +slider.value;
+			draw(k);
+		});
+		draw(k);
+
+		// 動きを減らす設定でなければ、見えたときに一度だけ再生する
+		if (!reduce && !location.search.includes('still')) {
+			const io = new IntersectionObserver((entries) => {
+				if (entries.some((e) => e.isIntersecting)) {
+					io.disconnect();
+					play();
+				}
+			}, { threshold: 0.5 });
+			io.observe(root);
+		}
+	}
+</script>

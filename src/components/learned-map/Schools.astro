@@ -1,0 +1,148 @@
+---
+// 図 6：状態の表し方（行）× 物理の入れ方（列）に手法を置く
+import { schools, schoolCells, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+}
+const { lang = 'ja' } = Astro.props;
+const s = schools[lang];
+const cells = schoolCells[lang];
+const at = (r: number, c: number) => cells.filter(([rr, cc]) => rr === r && cc === c);
+---
+
+<div class="lm-schools" role="table" aria-label={`${s.rowHead} × ${s.colHead}`}>
+	<div class="corner" aria-hidden="true"></div>
+	<div class="axis" role="columnheader">{s.colHead}</div>
+	<div class="corner rowaxis" role="columnheader">{s.rowHead}</div>
+	{s.cols.map((c) => <div class="colhead" role="columnheader">{c}</div>)}
+	{
+		s.rows.map((r, ri) => (
+			<>
+				<div class="rowhead" role="rowheader">{r}</div>
+				{s.cols.map((c, ci) => (
+					<div class:list={['cell', { empty: at(ri, ci).length === 0 }]} role="cell" data-col={c}>
+						{at(ri, ci).map(([, , name, note]) => (
+							<div class="chip" data-name={name} tabindex="0">
+								<b>{name}</b>
+								{note && <span>{note}</span>}
+							</div>
+						))}
+					</div>
+				))}
+			</>
+		))
+	}
+</div>
+
+<style>
+	.lm-schools {
+		display: grid;
+		grid-template-columns: 5.5rem repeat(3, minmax(0, 1fr));
+		gap: 2px;
+		background: #d9e0e6;
+		border: 1px solid #d9e0e6;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+	}
+	.lm-schools > div {
+		background: #fff;
+		padding: 0.5rem;
+	}
+	.corner,
+	.axis {
+		font-size: 0.75rem;
+		color: #5c6b7c;
+		background: #f3f5f6 !important;
+	}
+	.axis {
+		grid-column: span 3;
+		text-align: center;
+	}
+	.rowaxis {
+		align-self: stretch;
+	}
+	.colhead,
+	.rowhead {
+		font-weight: 600;
+		background: #f3f5f6 !important;
+		color: #15233d;
+	}
+	.colhead {
+		text-align: center;
+		align-self: stretch;
+	}
+	.cell {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		min-height: 3rem;
+	}
+	.chip {
+		border: 1px solid #2350d8;
+		border-radius: 4px;
+		padding: 0.2rem 0.45rem;
+		background: #fff;
+		outline: none;
+	}
+	.chip b {
+		display: block;
+		font-weight: 600;
+		color: #15233d;
+	}
+	.chip span {
+		display: block;
+		color: #5c6b7c;
+		font-size: 0.75rem;
+	}
+	.lm-schools:has(.chip:hover, .chip:focus-visible) .chip {
+		opacity: 0.45;
+	}
+	.chip:focus-visible {
+		outline: 2px solid #2350d8;
+		outline-offset: 1px;
+	}
+	/* 狭い幅では行ごとに縦に並べ、各マスに列の名前を出す */
+	@media (max-width: 36rem) {
+		.lm-schools {
+			display: block;
+			background: #fff;
+		}
+		.corner,
+		.axis,
+		.colhead,
+		.cell.empty {
+			display: none;
+		}
+		.rowhead {
+			border-top: 1px solid #d9e0e6;
+		}
+		.rowhead::after {
+			content: '';
+		}
+		.cell {
+			min-height: 0;
+		}
+		.cell::before {
+			content: attr(data-col);
+			font-size: 0.75rem;
+			color: #5c6b7c;
+		}
+	}
+</style>
+
+<script>
+	// 同じ手法が複数のマスにあるとき、まとめて強調する
+	for (const root of document.querySelectorAll<HTMLElement>('.lm-schools')) {
+		const chips = [...root.querySelectorAll<HTMLElement>('.chip')];
+		const mark = (name: string | null) => {
+			for (const c of chips) c.style.opacity = name === null ? '' : c.dataset.name === name ? '1' : '';
+		};
+		for (const c of chips) {
+			c.addEventListener('mouseenter', () => mark(c.dataset.name!));
+			c.addEventListener('focus', () => mark(c.dataset.name!));
+			c.addEventListener('mouseleave', () => mark(null));
+			c.addEventListener('blur', () => mark(null));
+		}
+	}
+</script>
