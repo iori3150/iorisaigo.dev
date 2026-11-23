@@ -2,17 +2,16 @@
 // 図の枠と説明。番号と説明は MDX から渡す
 interface Props {
 	n: number;
-	caption: string;
 	lang?: 'ja' | 'en';
-	id?: string;
 }
-const { n, caption, lang = 'ja', id } = Astro.props;
+const { n, lang = 'ja' } = Astro.props;
+const id = `fig-${n}`;
 const label = lang === 'ja' ? `図 ${n}` : `Figure ${n}`;
 ---
 
 <figure class="lm-figure not-content" id={id}>
 	<div class="lm-frame"><slot /></div>
-	<figcaption><span class="lm-num">{label}</span>{caption}</figcaption>
+	<figcaption><span class="lm-num">{label}</span><slot name="caption" /></figcaption>
 </figure>
 
 <style is:global>
@@ -42,6 +41,10 @@ const label = lang === 'ja' ? `図 ${n}` : `Figure ${n}`;
 		font-size: 0.875rem;
 		line-height: 1.7;
 		color: var(--lm-muted);
+	}
+	.lm-figure figcaption p {
+		display: inline;
+		margin: 0;
 	}
 	.lm-num {
 		font-weight: 600;

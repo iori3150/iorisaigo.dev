@@ -1,13 +1,8 @@
 ---
 // 図 6：状態の表し方（行）× 物理の入れ方（列）に手法を置く
-import { schools, schoolCells, type Lang } from './strings';
+import { schools as s, schoolCells as cells } from './strings';
+import { numberOf } from './refs';
 
-interface Props {
-	lang?: Lang;
-}
-const { lang = 'ja' } = Astro.props;
-const s = schools[lang];
-const cells = schoolCells[lang];
 const at = (r: number, c: number) => cells.filter(([rr, cc]) => rr === r && cc === c);
 ---
 
@@ -22,10 +17,15 @@ const at = (r: number, c: number) => cells.filter(([rr, cc]) => rr === r && cc =
 				<div class="rowhead" role="rowheader">{r}</div>
 				{s.cols.map((c, ci) => (
 					<div class:list={['cell', { empty: at(ri, ci).length === 0 }]} role="cell" data-col={c}>
-						{at(ri, ci).map(([, , name, note]) => (
+						{at(ri, ci).map(([, , name, note, cites]) => (
 							<div class="chip" data-name={name} tabindex="0">
 								<b>{name}</b>
 								{note && <span>{note}</span>}
+								<span class="src">
+									{cites.map((c) => (
+										<a class="lm-cite" href={`#ref-${c.k}`}>[{numberOf(c.k)}{c.at ? ` ${c.at}` : ''}]</a>
+									))}
+								</span>
 							</div>
 						))}
 					</div>
@@ -94,6 +94,9 @@ const at = (r: number, c: number) => cells.filter(([rr, cc]) => rr === r && cc =
 		display: block;
 		color: #5c6b7c;
 		font-size: 0.75rem;
+	}
+	.chip .src {
+		margin-top: 0.1rem;
 	}
 	.lm-schools:has(.chip:hover, .chip:focus-visible) .chip {
 		opacity: 0.45;

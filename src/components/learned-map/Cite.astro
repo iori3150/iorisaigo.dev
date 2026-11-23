@@ -1,0 +1,26 @@
+---
+// 引用の印。[番号 節] を参考文献の項目へのリンクにする。i は plugins/remark-cite-index.mjs が振る出現番号で、参考文献からここへ戻るのに使う
+import { numberOf } from './refs';
+
+interface Props {
+	k: string;
+	at?: string;
+	i?: string | number;
+}
+const { k, at, i } = Astro.props;
+const n = numberOf(k);
+---
+
+<a class="lm-cite" id={i === undefined ? undefined : `cite-${k}-${i}`} href={`#ref-${k}`}>[{n}{at ? ` ${at}` : ''}]</a>
+
+<style is:global>
+	.lm-cite {
+		font-size: 0.85em;
+		white-space: nowrap;
+		text-decoration: none;
+		margin: 0 0.1em;
+	}
+	.lm-cite:hover {
+		text-decoration: underline;
+	}
+</style>

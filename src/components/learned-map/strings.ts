@@ -1,5 +1,6 @@
-// IV-0「地図」の図で使う文字。英語版の MDX からも同じ部品を lang='en' で呼ぶ
+// IV-0 の図で使う文字。英語版の MDX からも同じ部品を lang='en' で呼ぶ
 export type Lang = 'ja' | 'en';
+import type { CiteRef } from './refs';
 
 export const ui = {
 	ja: {
@@ -66,50 +67,26 @@ export const stepBoxes = {
 	},
 };
 
-// 図 6 の見取り図
+// 図 6 の分類（日本語のみ）
 export const schools = {
-	ja: {
-		rowHead: '入力の表し方',
-		colHead: '物理の入れ方',
-		rows: ['粒子', 'メッシュ', '格子', '座標と関数'],
-		cols: ['構造', '損失', 'どちらにも入れない'],
-	},
-	en: {
-		rowHead: 'Input',
-		colHead: 'Where physics goes',
-		rows: ['Particles', 'Mesh', 'Grid', 'Coordinates, functions'],
-		cols: ['Architecture', 'Loss', 'Neither'],
-	},
+	rowHead: '入力の表し方',
+	colHead: '物理の入れ方',
+	rows: ['粒子', 'メッシュ', '格子', '座標と関数'],
+	cols: ['構造', '損失', 'どちらにも入れない'],
 };
 
-// [行, 列, 手法名, 何を入れたか]
-export const schoolCells: Record<Lang, [number, number, string, string][]> = {
-	ja: [
-		[0, 0, 'SPNets', 'SPH の計算を層に'],
-		[0, 0, 'Ummenhofer ら', '学習するカーネルの畳み込み'],
-		[0, 0, 'GNS', '相対位置と近傍グラフ'],
-		[0, 0, 'WorldParticle', '外力の積分と修正の分離'],
-		[0, 1, 'WorldParticle', '流体の発散'],
-		[1, 0, 'MeshGraphNets', 'メッシュの辺'],
-		[1, 2, 'Transolver', ''],
-		[2, 0, 'Tompson ら', '圧力投影だけ置き換え'],
-		[2, 1, 'Tompson ら', '投影後の速度の発散'],
-		[2, 2, 'FNO', ''],
-		[3, 1, 'PINNs', '支配方程式の残差'],
-		[3, 2, 'DeepONet', ''],
-	],
-	en: [
-		[0, 0, 'SPNets', 'SPH as layers'],
-		[0, 0, 'Ummenhofer et al.', 'learned-kernel convolution'],
-		[0, 0, 'GNS', 'relative positions, neighbor graph'],
-		[0, 0, 'WorldParticle', 'external force integrated separately'],
-		[0, 1, 'WorldParticle', 'fluid divergence'],
-		[1, 0, 'MeshGraphNets', 'mesh edges'],
-		[1, 2, 'Transolver', ''],
-		[2, 0, 'Tompson et al.', 'replaces only the pressure projection'],
-		[2, 1, 'Tompson et al.', 'divergence after projection'],
-		[2, 2, 'FNO', ''],
-		[3, 1, 'PINNs', 'PDE residual'],
-		[3, 2, 'DeepONet', ''],
-	],
-};
+// [行, 列, 手法名, 何を入れたか, 根拠]
+export const schoolCells: [number, number, string, string, CiteRef[]][] = [
+	[0, 0, 'SPNets', 'PBF（Position Based Fluids）の計算を層に', [{ k: 'schenck2018', at: '§4' }]],
+	[0, 0, 'Ummenhofer ら', '学習するカーネルの連続畳み込み', [{ k: 'ummenhofer2020', at: '§4、§5' }]],
+	[0, 0, 'GNS', '相対位置と近傍グラフ', [{ k: 'sanchez2020', at: '§4.2、§5.4' }]],
+	[0, 0, 'WorldParticle', '外力の積分と修正の分離', [{ k: 'wang2026', at: '§3、§3.1' }]],
+	[0, 1, 'WorldParticle', '流体の速度場の発散を損失に追加（任意）', [{ k: 'wang2026', at: '§3.4' }]],
+	[1, 0, 'MeshGraphNets', 'メッシュの辺', [{ k: 'pfaff2021', at: '§3' }]],
+	[1, 2, 'Transolver', '相対 L2 損失（予測と正解の差のノルムを正解のノルムで割った量。Darcy 流れの問題では勾配の項を追加）', [{ k: 'wu2024', at: '付録 B.3' }]],
+	[2, 0, 'Tompson ら', '圧力投影だけ置き換え', [{ k: 'tompson2017', at: '§3、§4' }]],
+	[2, 1, 'Tompson ら', '投影後の速度の発散', [{ k: 'tompson2017', at: '§4' }]],
+	[2, 2, 'FNO', '予測と正解を比べる費用関数', [{ k: 'li2021fno', at: '§2' }]],
+	[3, 1, 'PINNs', '支配方程式の残差', [{ k: 'raissi2019', at: 'arXiv 1711.10561 §2.1' }]],
+	[3, 2, 'DeepONet', '予測と正解の平均二乗誤差', [{ k: 'lu2021', at: '§2.2、§4' }]],
+];

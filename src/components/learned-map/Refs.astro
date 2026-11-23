@@ -1,0 +1,88 @@
+---
+// 参考文献の一覧。各項目から、本文の引用の箇所と、図の中で引用した図へ戻れる
+import { sorted, numberOf } from './refs';
+import { figureCites } from './figure-cites';
+
+interface Props {
+	uses?: string;
+	lang?: 'ja' | 'en';
+}
+const { uses = '{}', lang = 'ja' } = Astro.props;
+const counts: Record<string, number> = JSON.parse(uses);
+const figLabel = (id: string) => (lang === 'ja' ? `図 ${id.replace('fig-', '')}` : `Fig. ${id.replace('fig-', '')}`);
+const bodyLabel = lang === 'ja' ? '本文' : 'Text';
+---
+
+<ol class="lm-refs not-content">
+	{
+		sorted.map((r) => {
+			const figs = Object.entries(figureCites)
+				.filter(([, keys]) => keys.includes(r.key))
+				.map(([id]) => id);
+			return (
+				<li id={`ref-${r.key}`}>
+					<span class="n">[{numberOf(r.key)}]</span>
+					<span class="body">
+						{r.authors} ({r.year}). {r.title}. <i>{r.venue}</i>.
+						{r.url && (
+							<>
+								{' '}
+								<a href={r.url} rel="noreferrer">{r.url.replace('https://', '')}</a>
+							</>
+						)}
+						{(counts[r.key] || figs.length > 0) && (
+							<span class="back">
+								{counts[r.key] > 0 && (
+									<>
+										{bodyLabel}:
+										{Array.from({ length: counts[r.key] }, (_, j) => (
+											<a href={`#cite-${r.key}-${j + 1}`} aria-label={`${bodyLabel} ${j + 1}`}>↩{j + 1}</a>
+										))}
+									</>
+								)}
+								{figs.map((id) => (
+									<a href={`#${id}`}>↩{figLabel(id)}</a>
+								))}
+							</span>
+						)}
+					</span>
+				</li>
+			);
+		})
+	}
+</ol>
+
+<style>
+	.lm-refs {
+		list-style: none;
+		padding: 0;
+		margin: 1rem 0;
+		font-size: 0.875rem;
+		line-height: 1.7;
+	}
+	.lm-refs li {
+		display: grid;
+		grid-template-columns: 2.75rem 1fr;
+		margin: 0 0 0.5rem;
+		scroll-margin-top: 5rem;
+	}
+	.lm-refs li:target {
+		background: #dce4fa;
+	}
+	.n {
+		color: #5c6b7c;
+		font-variant-numeric: tabular-nums;
+	}
+	.body {
+		overflow-wrap: anywhere;
+	}
+	.back {
+		margin-left: 0.75em;
+		font-size: 0.8125rem;
+		white-space: nowrap;
+	}
+	.back a {
+		margin-left: 0.4em;
+		text-decoration: none;
+	}
+</style>

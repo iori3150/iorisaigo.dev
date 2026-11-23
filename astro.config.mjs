@@ -5,12 +5,13 @@ import sitemap from '@astrojs/sitemap';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeJaText from './src/plugins/rehype-ja-text.mjs';
+import remarkCiteIndex from './src/plugins/remark-cite-index.mjs';
 
 // ヘッダーに出すサイト名。決まったらここだけ変える
 const SITE_TITLE = 'Notes';
 
 // トップページはまだ無いので、ノートの最初のページへ送る
-const FIRST_NOTE = 'learned/00-map/';
+const FIRST_NOTE = 'learned/00-overview/';
 
 export default defineConfig({
 	site: 'https://iorisaigo.dev',
@@ -18,9 +19,12 @@ export default defineConfig({
 		'/': `/ja/${FIRST_NOTE}`,
 		'/ja/': `/ja/${FIRST_NOTE}`,
 		'/en/': `/en/${FIRST_NOTE}`,
+		// 旧 URL（章名を「地図」にしていたとき）
+		'/ja/learned/00-map/': '/ja/learned/00-overview/',
+		'/en/learned/00-map/': '/en/learned/00-overview/',
 	},
 	markdown: {
-		remarkPlugins: [remarkMath],
+		remarkPlugins: [remarkMath, remarkCiteIndex],
 		rehypePlugins: [rehypeKatex, rehypeJaText],
 	},
 	integrations: [
@@ -39,7 +43,7 @@ export default defineConfig({
 					label: '第 IV 部　学習型のシミュレーター',
 					translations: { en: 'Part IV  Learned simulators' },
 					items: [
-						{ label: '0　地図', translations: { en: '0  Map' }, slug: 'learned/00-map' },
+						{ label: '0　概観', translations: { en: '0  Overview' }, slug: 'learned/00-overview' },
 					],
 				},
 			],

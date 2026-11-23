@@ -2,6 +2,7 @@
 // 図 3：2016〜2026 年の手法を帯に並べる。点を選ぶと、前の手法の何に困り何を変えたかを下に出す
 import { ui, type Lang } from './strings';
 import { bands, items } from './timeline-data';
+import { numberOf, type CiteRef } from './refs';
 
 interface Props {
 	lang?: Lang;
@@ -17,14 +18,29 @@ const yearX = (y: number) => (y <= 2015 ? preX : 216 + (y - 2016) * 46);
 const bandH = 62;
 const top = 8;
 const itemY = (band: number, slot: number) => top + band * bandH + 15 + slot * 17;
-const H = top + bands[lang].length * bandH + 28;
+const H = top + bands.length * bandH + 28;
 const pos = Object.fromEntries(items.map((it) => [it.id, { x: yearX(it.year), y: itemY(it.band, it.slot) }]));
-const edges = items.flatMap((it) => it.from.map((f) => ({ from: f, to: it.id })));
+const edges = items.flatMap((it) => it.from.map((f) => ({ from: f.id, to: it.id })));
 const curve = (a: { x: number; y: number }, b: { x: number; y: number }) => {
 	const mx = (a.x + b.x) / 2;
 	return `M${a.x} ${a.y}C${mx} ${a.y} ${mx} ${b.y} ${b.x} ${b.y}`;
 };
-const detail = Object.fromEntries(items.map((it) => [it.id, { ...it.text[lang], from: it.from }]));
+const mark = (cs: CiteRef[]) => cs.map((c) => ({ k: c.k, n: numberOf(c.k), at: c.at }));
+const detail = Object.fromEntries(
+	items.map((it) => [
+		it.id,
+		{
+			name: it.name,
+			nameCites: mark([{ k: it.paper }]),
+			problem: it.problem,
+			problemCites: mark(it.problemCites),
+			change: it.change,
+			changeCites: mark(it.changeCites),
+			// 線の根拠は、その手法の論文が先行として挙げている節
+			from: it.from.map((f) => ({ id: f.id, cites: mark([{ k: it.paper, at: f.at }]) })),
+		},
+	]),
+);
 const labels = Object.fromEntries(items.map((it) => [it.id, it.label]));
 // 右端に近い点はラベルを左に置く
 const leftLabel = (it: (typeof items)[number]) => it.year >= 2026;
@@ -34,7 +50,7 @@ const leftLabel = (it: (typeof items)[number]) => it.year >= 2026;
 	<div class="lm-scroll">
 		<svg viewBox={`0 0 ${W} ${H}`} style="min-width: 600px" role="group" aria-label={lang === 'ja' ? '手法の年表' : 'Timeline of methods'}>
 			{
-				bands[lang].map((b, i) => (
+				bands.map((b, i) => (
 					<g>
 						<rect x="0" y={top + i * bandH} width={W} height={bandH - 4} fill={i % 2 ? '#fff' : '#f3f5f6'} />
 						<text x="8" y={top + i * bandH + bandH / 2 + 2} font-size="12" fill="#5c6b7c">
@@ -57,7 +73,7 @@ const leftLabel = (it: (typeof items)[number]) => it.year >= 2026;
 			</g>
 			{
 				items.map((it) => (
-					<g class="lm-tl-item" tabindex="0" role="button" aria-pressed="false" data-id={it.id} aria-label={it.text[lang].name}>
+					<g class="lm-tl-item" tabindex="0" role="button" aria-pressed="false" data-id={it.id} aria-label={it.name}>
 						<circle cx={pos[it.id].x} cy={pos[it.id].y} r="12" fill="transparent" />
 						<circle class="dot" cx={pos[it.id].x} cy={pos[it.id].y} r="5.5" />
 						<text
@@ -74,9 +90,9 @@ const leftLabel = (it: (typeof items)[number]) => it.year >= 2026;
 		</svg>
 	</div>
 	<div class="lm-tl-panel" aria-live="polite">
-		<p class="lm-tl-name" data-name></p>
+		<p class="lm-tl-name"><span data-name></span><span data-name-cites></span></p>
 		<dl>
-			<dt>{t.problem}</dt>
+			<dt data-problem-label>{t.problem}</dt>
 			<dd data-problem></dd>
 			<dt>{t.change}</dt>
 			<dd data-change></dd>
@@ -154,10 +170,14 @@ const leftLabel = (it: (typeof items)[number]) => it.year >= 2026;
 		background: none;
 		border: 0;
 		padding: 0;
-		margin-right: 1em;
+		margin-right: 0.25em;
 		cursor: pointer;
 		text-decoration: underline;
 		text-underline-offset: 2px;
+	}
+	.lm-tl-panel dd :global(span) {
+		display: inline-block;
+		margin-right: 1.25em;
 	}
 	@media (max-width: 30rem) {
 		.lm-tl-panel dl {
@@ -181,7 +201,7 @@ const leftLabel = (it: (typeof items)[number]) => it.year >= 2026;
 			const d = detail[id];
 			for (const g of itemsEls) {
 				g.setAttribute('aria-pressed', String(g.dataset.id === id));
-				g.classList.toggle('is-from', d.from.includes(g.dataset.id));
+				g.classList.toggle('is-from', d.from.some((f: { id: string }) => f.id === g.dataset.id));
 			}
 			for (const p of edgeEls) {
 				const on = p.dataset.to === id;
@@ -197,17 +217,30 @@ const leftLabel = (it: (typeof items)[number]) => it.year >= 2026;
 				const sr = sc.getBoundingClientRect();
 				sc.scrollLeft += r.left - sr.left - sc.clientWidth / 2;
 			}
+			const cites = (list: { k: string; n: number; at?: string }[]) =>
+				list.map((c) => {
+					const a = document.createElement('a');
+					a.className = 'lm-cite';
+					a.href = `#ref-${c.k}`;
+					a.textContent = `[${c.n}${c.at ? ` ${c.at}` : ''}]`;
+					return a;
+				});
 			q('[data-name]').textContent = d.name;
-			q('[data-problem]').textContent = d.problem;
-			q('[data-change]').textContent = d.change;
+			q('[data-name-cites]').replaceChildren(...cites(d.nameCites));
+			const problemEl = q('[data-problem]');
+			problemEl.replaceChildren(d.problem, ...cites(d.problemCites));
+			problemEl.hidden = q('[data-problem-label]').hidden = d.problem === '';
+			q('[data-change]').replaceChildren(d.change, ...cites(d.changeCites));
 			const fromEl = q('[data-from-list]');
 			fromEl.replaceChildren(
-				...d.from.map((f: string) => {
+				...d.from.map((f: { id: string; cites: { k: string; n: number; at?: string }[] }) => {
+					const w = document.createElement('span');
 					const b = document.createElement('button');
 					b.type = 'button';
-					b.textContent = labels[f];
-					b.addEventListener('click', () => select(f));
-					return b;
+					b.textContent = labels[f.id];
+					b.addEventListener('click', () => select(f.id));
+					w.append(b, ...cites(f.cites));
+					return w;
 				}),
 			);
 			const hasFrom = d.from.length > 0;
