@@ -44,6 +44,7 @@ export default defineConfig({
 					translations: { en: 'Part IV  Learned simulators' },
 					items: [
 						{ label: '0　概観', translations: { en: '0  Overview' }, slug: 'learned/00-overview' },
+						{ label: '1　学習型シミュレーターの分類', translations: { en: '1  A taxonomy of learned simulators' }, slug: 'learned/01-taxonomy' },
 					],
 				},
 			],

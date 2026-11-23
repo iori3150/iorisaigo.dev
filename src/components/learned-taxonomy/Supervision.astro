@@ -1,0 +1,103 @@
+---
+// 図 4：教師（シミュレーションの結果／方程式だけ）と損失（1 ステップ先／4 ステップ先）を切り替え、
+// 学習データの量と入力の雑音を変えて、学んだ写像を 40 ステップつないだときの誤差を見る
+import { ui, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+}
+const { lang = 'ja' } = Astro.props;
+const t = ui[lang];
+---
+
+<div class="lt-sup" data-t={JSON.stringify(t)}>
+	<div class="lm-legend">
+		<span style="--c: #2350d8">{t.learned}</span>
+		<span style="--c: #c4581c" class="dash">{t.explicit}</span>
+		<span style="--c: #15233d" class="dot">{t.reference}</span>
+	</div>
+	<div class="lm-scroll"><svg viewBox="0 0 720 250" role="img" aria-label={`${t.teacher} / ${t.loss}`} style="min-width: 560px"></svg></div>
+	<div class="lm-controls">
+		<span>{t.teacher}</span>
+		<span role="group" aria-label={t.teacher} class="lt-seg">
+			<button type="button" class="lm-btn" data-teacher="data" aria-pressed="true">{t.teacherData}</button>
+			<button type="button" class="lm-btn" data-teacher="equation" aria-pressed="false">{t.teacherEq}</button>
+		</span>
+		<span>{t.loss}</span>
+		<span role="group" aria-label={t.loss} class="lt-seg">
+			<button type="button" class="lm-btn" data-loss="one" aria-pressed="true">{t.lossOne}</button>
+			<button type="button" class="lm-btn" data-loss="multi" aria-pressed="false">{t.lossMulti}</button>
+		</span>
+	</div>
+	<div class="lm-controls">
+		<label>{t.trajs}<input type="range" min="1" max="16" step="1" value="2" data-n /><output data-n-out></output></label>
+		<label>{t.noise}<input type="range" min="0" max="5" step="1" value="0" data-s /><output data-s-out></output></label>
+	</div>
+	<div class="lm-readout">
+		<span>{t.oneStep} <b data-e1></b></span>
+		<span>40 {t.after} <b data-e40></b></span>
+		<span>{t.growth} <b data-g></b></span>
+	</div>
+</div>
+
+<script>
+	import * as C from './calc';
+	import { el, text, clear, fmt, profileFrame, logFrame, polyline, COLORS } from './draw';
+
+	const SIGMAS = [0, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2];
+	const STEPS = 40;
+	const sigmaLabel = (s: number) => (s === 0 ? '0' : fmt(s));
+
+	for (const root of document.querySelectorAll<HTMLElement>('.lt-sup')) {
+		const t = JSON.parse(root.dataset.t!);
+		const svg = root.querySelector('svg')!;
+		const nIn = root.querySelector<HTMLInputElement>('[data-n]')!;
+		const sIn = root.querySelector<HTMLInputElement>('[data-s]')!;
+		const nOut = root.querySelector('[data-n-out]')!;
+		const sOut = root.querySelector('[data-s-out]')!;
+		const e1Out = root.querySelector('[data-e1]')!;
+		const e40Out = root.querySelector('[data-e40]')!;
+		const gOut = root.querySelector('[data-g]')!;
+		const tBtns = [...root.querySelectorAll<HTMLButtonElement>('[data-teacher]')];
+		const lBtns = [...root.querySelectorAll<HTMLButtonElement>('[data-loss]')];
+		let teacher: C.Teacher = 'data', loss: C.Loss = 'one';
+
+		const r = C.R_BASE;
+		const ref = C.reference(r, C.TEST_U0, STEPS);
+		const exp = C.rollout(C.explicitA(r), C.TEST_U0, STEPS);
+		const errOf = (ro: number[][]) => ro.map((u, k) => C.rmsDiff(u, ref[k]));
+
+		const gL = el('g', {}, svg), gR = el('g', {}, svg);
+		const fL = logFrame(gL, { x0: 50, x1: 330, y0: 30, y1: 200 }, -4, 1, STEPS, [0, 10, 20, 30, 40], t.step, t.errorRms);
+		el('polyline', { fill: 'none', stroke: COLORS.solver, 'stroke-width': 1.5, 'stroke-dasharray': '5 4', points: polyline(errOf(exp).slice(1).map((e, k) => [fL.sx(k + 1), fL.sy(e)])) }, gL);
+		text(gR, 420, 18, `40 ${t.atStep}`, { fill: COLORS.text, size: 12, weight: 600 });
+		const fR = profileFrame(gR, { x0: 420, x1: 680, y0: 34, y1: 194 }, -0.2, 0.6, [0, 0.2, 0.4, 0.6]);
+		C.XS.forEach((x, j) => el('circle', { cx: fR.sx(x), cy: fR.sy(ref[STEPS][j]), r: 2.6, fill: COLORS.text }, gR));
+		const dynL = el('g', {}, gL), dynR = el('g', {}, gR);
+
+		const draw = () => {
+			const nTraj = +nIn.value, sigma = SIGMAS[+sIn.value];
+			nOut.textContent = String(nTraj);
+			sOut.textContent = sigmaLabel(sigma);
+			tBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.teacher === teacher)));
+			lBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.loss === loss)));
+			const B = C.fitStep({ r, nTraj, sigma, teacher, loss });
+			const ro = C.rollout(B, C.TEST_U0, STEPS);
+			const e = errOf(ro);
+			clear(dynL);
+			el('polyline', { fill: 'none', stroke: COLORS.learned, 'stroke-width': 2, points: polyline(e.slice(1).map((v, k) => [fL.sx(k + 1), fL.sy(v)])) }, dynL);
+			clear(dynR);
+			const clip = (v: number) => Math.max(-0.2, Math.min(0.6, v));
+			el('polyline', { fill: 'none', stroke: COLORS.learned, 'stroke-width': 2, points: polyline([0, ...C.XS, 1].map((x, i) => [fR.sx(x), fR.sy(clip([0, ...ro[STEPS], 0][i]))])) }, dynR);
+			e1Out.textContent = fmt(C.oneStepError(B, r));
+			e40Out.textContent = fmt(e[STEPS]);
+			const g = C.growth(B);
+			gOut.textContent = `${g.toFixed(3)}（${g > 1 ? t.unstable : t.stable}）`;
+		};
+		tBtns.forEach((b) => b.addEventListener('click', () => ((teacher = b.dataset.teacher as C.Teacher), draw())));
+		lBtns.forEach((b) => b.addEventListener('click', () => ((loss = b.dataset.loss as C.Loss), draw())));
+		nIn.addEventListener('input', draw);
+		sIn.addEventListener('input', draw);
+		draw();
+	}
+</script>

@@ -1,0 +1,134 @@
+---
+// 図 2：同じ温度の分布を、格子・ばらばらの点・正弦の係数の 3 つで表し、同じ 1 ステップの写像を 2 つの表し方で並べる
+import { ui, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+}
+const { lang = 'ja' } = Astro.props;
+const t = ui[lang];
+---
+
+<div class="lt-repr" data-t={JSON.stringify(t)}>
+	<div class="lm-scroll"><svg viewBox="0 0 720 480" role="img" aria-label={`${t.grid} / ${t.scattered} / ${t.modes}`} style="min-width: 560px"></svg></div>
+	<div class="lm-controls">
+		<label>{t.points}<input type="range" min="4" max="32" step="1" value="10" data-m /><output data-m-out></output></label>
+		<label>{t.kmax}<input type="range" min="1" max="16" step="1" value="4" data-k /><output data-k-out></output></label>
+	</div>
+</div>
+
+<script>
+	import * as C from './calc';
+	import { el, text, clear, fmt, profileFrame, polyline, heatmap, COLORS } from './draw';
+
+	for (const root of document.querySelectorAll<HTMLElement>('.lt-repr')) {
+		const t = JSON.parse(root.dataset.t!);
+		const svg = root.querySelector('svg')!;
+		const mIn = root.querySelector<HTMLInputElement>('[data-m]')!;
+		const kIn = root.querySelector<HTMLInputElement>('[data-k]')!;
+		const mOut = root.querySelector('[data-m-out]')!;
+		const kOut = root.querySelector('[data-k-out]')!;
+
+		const f = C.TEST_FN;
+		const u = C.TEST_U0;
+		const fine = Array.from({ length: 201 }, (_, i) => i / 200);
+
+		const panel = (x0: number, title: string) => {
+			const g = el('g', {}, svg);
+			text(g, x0, 18, title, { fill: COLORS.text, size: 12, weight: 600 });
+			return g;
+		};
+		// 格子
+		const g1 = panel(40, t.grid);
+		const f1 = profileFrame(g1, { x0: 40, x1: 210, y0: 34, y1: 164 });
+		el('polyline', { fill: 'none', stroke: COLORS.rule, 'stroke-width': 1.5, points: polyline(fine.map((x) => [f1.sx(x), f1.sy(f(x))])) }, g1);
+		C.XS.forEach((x, i) => {
+			el('line', { x1: f1.sx(x), x2: f1.sx(x), y1: f1.sy(0), y2: f1.sy(u[i]), stroke: COLORS.learned, 'stroke-width': 1 }, g1);
+			el('circle', { cx: f1.sx(x), cy: f1.sy(u[i]), r: 2.8, fill: COLORS.learned }, g1);
+		});
+		text(g1, 40, 200, `${t.recon} 0`, { fill: COLORS.text });
+
+		// ばらばらの点（スライダーで描き直す）
+		const g2 = panel(280, t.scattered);
+		const f2 = profileFrame(g2, { x0: 280, x1: 450, y0: 34, y1: 164 });
+		el('polyline', { fill: 'none', stroke: COLORS.rule, 'stroke-width': 1.5, points: polyline(fine.map((x) => [f2.sx(x), f2.sy(f(x))])) }, g2);
+		const dyn2 = el('g', {}, g2);
+		// 下の帯にグラフ（点と、半径 0.15 の内側を結ぶ辺）を描く
+		const GY = 222;
+		const info2 = text(g2, 280, 200, '', { fill: COLORS.text });
+		text(g2, 450, 236, t.radius, { size: 10, anchor: 'end' });
+
+		// 正弦の係数
+		const g3 = panel(520, t.modes);
+		const dyn3 = el('g', {}, g3);
+		const info3 = text(g3, 520, 200, '', { fill: COLORS.text });
+		const coef = C.toModes(u);
+		const cmax = Math.max(...coef.map(Math.abs));
+
+		// 下段：同じ 1 ステップの写像 P を、格子の値の上と正弦の係数の上で
+		const P = C.solverStep(C.R_BASE);
+		const PM = C.inModes(P);
+		const cell = 11;
+		const gm = el('g', {}, svg);
+		text(gm, 40, 262, t.gridBasis, { fill: COLORS.text, size: 12, weight: 600 });
+		heatmap(gm, P, 40, 272, cell, 0.5);
+		text(gm, 280, 262, t.modeBasis, { fill: COLORS.text, size: 12, weight: 600 });
+		heatmap(gm, PM, 280, 272, cell, 0.5);
+		text(gm, 280, 272 + 16 * cell + 16, `${t.mode} 1 … 16`, { size: 10 });
+		// 対角の値（モードごとの減衰の率）
+		const gd = el('g', {}, gm);
+		text(gd, 520, 262, t.diag, { fill: COLORS.text, size: 12, weight: 600 });
+		const bx = (k: number) => 520 + k * 11;
+		const by = (v: number) => 448 - v * 160;
+		el('line', { x1: 520, x2: 520 + 16 * 11, y1: by(0), y2: by(0), stroke: COLORS.rule }, gd);
+		el('line', { x1: 520, x2: 520 + 16 * 11, y1: by(1), y2: by(1), stroke: COLORS.grid }, gd);
+		text(gd, 515, by(1) + 4, '1', { anchor: 'end', size: 10 });
+		text(gd, 515, by(0) + 4, '0', { anchor: 'end', size: 10 });
+		PM.forEach((row, k) => el('rect', { x: bx(k) + 1, y: by(Math.max(0, row[k])), width: 9, height: Math.abs(by(0) - by(Math.max(0, row[k]))), fill: COLORS.other }, gd));
+		text(gd, 520, 464, `${t.mode} 1`, { size: 10 });
+		text(gd, 520 + 16 * 11, 464, '16', { anchor: 'end', size: 10 });
+
+		const draw = () => {
+			const M = +mIn.value, K = +kIn.value;
+			mOut.textContent = String(M);
+			kOut.textContent = String(K);
+			// ばらばらの点：半径 0.15 の内側を辺で結び、線形補間で戻す
+			clear(dyn2);
+			const s = C.scattered(M, f);
+			for (let a = 0; a < M; a++)
+				for (let b = a + 1; b < M; b++)
+					if (Math.abs(s.xs[a] - s.xs[b]) < 0.15) {
+						const xa = f2.sx(s.xs[a]), xb = f2.sx(s.xs[b]);
+						el('path', { d: `M${xa},${GY} Q${(xa + xb) / 2},${GY - 4 - (xb - xa) * 0.35} ${xb},${GY}`, fill: 'none', stroke: COLORS.faint, 'stroke-width': 0.8 }, dyn2);
+					}
+			el('polyline', { fill: 'none', stroke: COLORS.learned, 'stroke-width': 1.5, 'stroke-dasharray': '4 3', points: polyline(fine.map((x) => [f2.sx(x), f2.sy(s.interp(x))])) }, dyn2);
+			s.xs.forEach((x, i) => {
+				el('circle', { cx: f2.sx(x), cy: f2.sy(s.vs[i]), r: 2.8, fill: COLORS.learned }, dyn2);
+				el('circle', { cx: f2.sx(x), cy: GY, r: 2.2, fill: COLORS.faint }, dyn2);
+			});
+			info2.textContent = `${t.recon} ${fmt(C.rmsDiff(C.XS.map(s.interp), u))}`;
+
+			// 正弦の係数：棒（使う K 個を濃く）と、K 個から戻した分布
+			clear(dyn3);
+			const bx3 = (k: number) => 520 + k * 10.6;
+			const by3 = (v: number) => 74 - (v / cmax) * 38;
+			el('line', { x1: 520, x2: 690, y1: by3(0), y2: by3(0), stroke: COLORS.rule }, dyn3);
+			coef.forEach((v, k) => {
+				const y = by3(v);
+				el('rect', { x: bx3(k) + 1, y: Math.min(y, by3(0)), width: 8, height: Math.max(0.5, Math.abs(y - by3(0))), fill: k < K ? COLORS.other : COLORS.rule }, dyn3);
+			});
+			text(dyn3, 520, 124, `${t.mode} 1`, { size: 10 });
+			text(dyn3, 690, 124, '16', { anchor: 'end', size: 10 });
+			const back = C.fromModes(coef.map((v, k) => (k < K ? v : 0)));
+			info3.textContent = `${t.recon} ${fmt(C.rmsDiff(back, u))}`;
+			// 戻した分布を、小さく棒の下に重ねる
+			const sx = (x: number) => 520 + 170 * x;
+			const sy = (v: number) => 180 - 44 * v;
+			el('polyline', { fill: 'none', stroke: COLORS.rule, 'stroke-width': 1, points: polyline(fine.map((x) => [sx(x), sy(f(x))])) }, dyn3);
+			el('polyline', { fill: 'none', stroke: COLORS.other, 'stroke-width': 1.5, 'stroke-dasharray': '4 3', points: polyline([0, ...C.XS, 1].map((x, i) => [sx(x), sy([0, ...back, 0][i])])) }, dyn3);
+		};
+		mIn.addEventListener('input', draw);
+		kIn.addEventListener('input', draw);
+		draw();
+	}
+</script>

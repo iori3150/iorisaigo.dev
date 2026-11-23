@@ -1,0 +1,106 @@
+---
+// 図 3：出力を「次の状態」にするか「差分」にするかで、同じ 10% の誤差が次の状態に与えるずれが変わる
+import { ui, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+}
+const { lang = 'ja' } = Astro.props;
+const t = ui[lang];
+---
+
+<div class="lt-output" data-t={JSON.stringify(t)}>
+	<div class="lm-legend">
+		<span style="--c: #8c99a6">{t.now}</span>
+		<span style="--c: #15233d">{t.next}</span>
+		<span style="--c: #2350d8">{t.target}</span>
+	</div>
+	<div class="lm-scroll"><svg viewBox="0 0 720 230" role="img" aria-label={`${t.outState} / ${t.outDelta}`} style="min-width: 560px"></svg></div>
+	<div class="lm-controls">
+		<span role="group" aria-label={t.output} class="lt-seg">
+			<button type="button" class="lm-btn" data-out="state" aria-pressed="true">{t.outState}</button>
+			<button type="button" class="lm-btn" data-out="delta" aria-pressed="false">{t.outDelta}</button>
+		</span>
+		<label>Δt（r = αΔt/Δx²）<input type="range" min="0.05" max="1" step="0.05" value="0.4" data-r /><output data-r-out></output></label>
+	</div>
+	<div class="lm-readout"><span>{t.targetSize} <b data-size></b></span><span>{t.nextErr} <b data-err></b></span></div>
+</div>
+
+<style is:global>
+	.lt-seg {
+		display: inline-flex;
+		gap: 0;
+	}
+	.lt-seg .lm-btn {
+		border-radius: 0;
+	}
+	.lt-seg .lm-btn:first-child {
+		border-radius: 4px 0 0 4px;
+	}
+	.lt-seg .lm-btn:last-child {
+		border-radius: 0 4px 4px 0;
+		margin-left: -1px;
+	}
+	.lt-seg .lm-btn[aria-pressed='true'] {
+		background: var(--lm-accent);
+		color: #fff;
+	}
+</style>
+
+<script>
+	import * as C from './calc';
+	import { el, text, clear, fmt, profileFrame, polyline, COLORS } from './draw';
+
+	const SHARE = 0.1; // 出力に乗るとする誤差の割合
+
+	for (const root of document.querySelectorAll<HTMLElement>('.lt-output')) {
+		const t = JSON.parse(root.dataset.t!);
+		const svg = root.querySelector('svg')!;
+		const rIn = root.querySelector<HTMLInputElement>('[data-r]')!;
+		const rOut = root.querySelector('[data-r-out]')!;
+		const sizeOut = root.querySelector('[data-size]')!;
+		const errOut = root.querySelector('[data-err]')!;
+		const btns = [...root.querySelectorAll<HTMLButtonElement>('[data-out]')];
+		let mode: 'state' | 'delta' = 'state';
+
+		const gL = el('g', {}, svg), gR = el('g', {}, svg);
+		text(gL, 40, 18, `${t.now} → ${t.next}`, { fill: COLORS.text, size: 12, weight: 600 });
+		const fL = profileFrame(gL, { x0: 40, x1: 320, y0: 34, y1: 194 }, -0.2, 1, [0, 0.5, 1]);
+		const titleR = text(gR, 400, 18, '', { fill: COLORS.text, size: 12, weight: 600 });
+		const fR = profileFrame(gR, { x0: 400, x1: 680, y0: 34, y1: 194 }, -0.2, 1, [0, 0.5, 1]);
+		const dynL = el('g', {}, gL), dynR = el('g', {}, gR);
+		const xs = [0, ...C.XS, 1];
+		const pad = (u: number[]) => [0, ...u, 0];
+
+		const draw = () => {
+			const r = +rIn.value;
+			rOut.textContent = r.toFixed(2);
+			btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.out === mode)));
+			const u0 = C.TEST_U0, u1 = C.mv(C.solverStep(r), u0);
+			const target = mode === 'state' ? u1 : u1.map((v, i) => v - u0[i]);
+			clear(dynL);
+			el('polyline', { fill: 'none', stroke: COLORS.faint, 'stroke-width': 1.5, points: polyline(xs.map((x, i) => [fL.sx(x), fL.sy(pad(u0)[i])])) }, dynL);
+			el('polyline', { fill: 'none', stroke: COLORS.text, 'stroke-width': 1.5, points: polyline(xs.map((x, i) => [fL.sx(x), fL.sy(pad(u1)[i])])) }, dynL);
+			// 右：出力の正解と、その大きさの 10% の幅
+			clear(dynR);
+			titleR.textContent = `${t.output}：${mode === 'state' ? t.outState : t.outDelta}`;
+			const s = C.rmsOf(target) * SHARE;
+			const up = pad(target).map((v) => v + s), dn = pad(target).map((v) => v - s);
+			el('polygon', { fill: 'rgba(35,80,216,0.18)', points: polyline([...xs.map((x, i) => [fR.sx(x), fR.sy(up[i])] as [number, number]), ...xs.map((x, i) => [fR.sx(x), fR.sy(dn[i])] as [number, number]).reverse()]) }, dynR);
+			el('polyline', { fill: 'none', stroke: COLORS.learned, 'stroke-width': 1.5, points: polyline(xs.map((x, i) => [fR.sx(x), fR.sy(pad(target)[i])])) }, dynR);
+			// 読み値は、学習データと同じ分布の別の軌跡で測った大きさ
+			const sz = C.targetSizes(r);
+			const size = mode === 'state' ? sz.state : sz.delta;
+			sizeOut.textContent = fmt(size);
+			errOut.textContent = fmt(SHARE * size);
+		};
+		btns.forEach((b) =>
+			b.addEventListener('click', () => {
+				mode = b.dataset.out as 'state' | 'delta';
+				draw();
+			}),
+		);
+		rIn.addEventListener('input', draw);
+		draw();
+	}
+</script>

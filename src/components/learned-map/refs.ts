@@ -52,9 +52,18 @@ export const sorted: Ref[] = refs
 	.sort((a, b) => a.r.year - b.r.year || a.i - b.i)
 	.map(({ r }) => r);
 
-export const numberOf = (key: string): number => {
-	const i = sorted.findIndex((r) => r.key === key);
-	if (i < 0) throw new Error(`参考文献のキーが無い: ${key}`);
+// ページごとの参考文献（番号はそのページの中で年の古い順に振り直す）。載っていないページ（IV-0）は全件
+export const pageRefs: Record<string, string[]> = {
+	'learned/01-taxonomy': ['tompson2017', 'raissi2019', 'sanchez2020', 'pfaff2021', 'li2021fno', 'lu2021', 'brandstetter2022', 'wu2024'],
+};
+export const listFor = (page?: string): Ref[] => {
+	const keys = page ? pageRefs[page] : undefined;
+	return keys ? sorted.filter((r) => keys.includes(r.key)) : sorted;
+};
+
+export const numberOf = (key: string, page?: string): number => {
+	const i = listFor(page).findIndex((r) => r.key === key);
+	if (i < 0) throw new Error(`参考文献のキーが無い: ${key}（${page ?? 'IV-0'}）`);
 	return i + 1;
 };
 
