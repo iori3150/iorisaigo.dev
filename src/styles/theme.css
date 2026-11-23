@@ -1,0 +1,114 @@
+/* 配色と書体は design/mockups/a2-notes.html（A 案の手直し a2）から取る */
+:root,
+:root[data-theme='light'] {
+	--sl-color-white: #15233d; /* 文字 */
+	--sl-color-gray-1: #15233d;
+	--sl-color-gray-2: #2b3a50;
+	--sl-color-gray-3: #5c6b7c;
+	--sl-color-gray-4: #8c99a6;
+	--sl-color-gray-5: #d9e0e6;
+	--sl-color-gray-6: #ebeff2;
+	--sl-color-gray-7: #f3f5f6;
+	--sl-color-black: #f3f5f6; /* 地 */
+
+	--sl-color-accent-low: #dce4fa;
+	--sl-color-accent: #2350d8;
+	--sl-color-accent-high: #1a3ca6;
+
+	--sl-color-text: #15233d;
+	--sl-color-text-accent: #2350d8;
+	--sl-color-bg: #f3f5f6;
+	--sl-color-bg-nav: #f3f5f6;
+	--sl-color-bg-sidebar: #ebeff2;
+	--sl-color-bg-inline-code: #e3e8ec;
+	--sl-color-hairline: #d9e0e6;
+	--sl-color-hairline-light: #d9e0e6;
+	--sl-color-hairline-shade: #d9e0e6;
+
+	--sl-font: 'IBM Plex Sans JP', 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+	--sl-line-height: 1.9;
+	--sl-line-height-headings: 1.4;
+	--sl-text-body: 1rem;
+	--sl-content-width: 44rem;
+	--sl-sidebar-width: 20rem;
+	--sl-text-h1: 1.75rem;
+	color-scheme: light;
+}
+
+@media (min-width: 50rem) {
+	:root,
+	:root[data-theme='light'] {
+		--sl-text-body: 1.03125rem; /* 16.5px */
+		--sl-text-h1: 2.375rem; /* 38px */
+		--sl-text-h2: 1.5rem;
+		--sl-text-h3: 1.1875rem;
+	}
+}
+
+/* 見出し */
+h1,
+.sl-markdown-content :is(h2, h3, h4) {
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+.sl-markdown-content h2 {
+	margin-top: 2.5rem;
+}
+.sl-markdown-content strong {
+	font-weight: 600;
+}
+
+/* ヘッダーとサイドバー */
+.site-title {
+	font-size: 0.9375rem;
+	font-weight: 500;
+	color: var(--sl-color-white);
+	gap: 0.625rem;
+}
+.site-title img {
+	height: 1.5rem;
+	width: auto;
+}
+.sidebar-content {
+	font-size: 0.90625rem;
+}
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover {
+	background-color: var(--sl-color-accent-low);
+	color: var(--sl-color-white);
+	font-weight: 500;
+}
+.sidebar-content summary .group-label .large {
+	font-size: 0.90625rem;
+	font-weight: 500;
+	color: var(--sl-color-white);
+}
+
+/* 表：幅を超える表は横に送る */
+.sl-markdown-content table {
+	font-size: 0.875rem;
+	line-height: 1.7;
+}
+.sl-markdown-content th {
+	font-weight: 600;
+	background-color: var(--sl-color-gray-6);
+}
+.sl-markdown-content :is(th, td) {
+	border-color: var(--sl-color-hairline);
+}
+
+/* 数式：長い式は横に送る */
+.sl-markdown-content .katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.25rem 0;
+}
+.sl-markdown-content .katex {
+	font-size: 1.05em;
+}
+
+/* 脚注と参考文献 */
+.sl-markdown-content .footnotes {
+	font-size: 0.875rem;
+	color: var(--sl-color-gray-3);
+}

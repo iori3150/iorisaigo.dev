@@ -1,0 +1,23 @@
+---
+import Default from '@astrojs/starlight/components/Footer.astro';
+
+const disclaimer = Astro.locals.starlightRoute.lang === 'ja' ? '内容は個人の見解です' : 'Views are my own';
+---
+
+<Default />
+<div class="site-footer">
+	<span>Iori Saigo</span>
+	<span>{disclaimer}</span>
+</div>
+
+<style>
+	.site-footer {
+		display: flex;
+		gap: 1.5rem;
+		margin-top: 3rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--sl-color-hairline);
+		font-size: var(--sl-text-xs);
+		color: var(--sl-color-gray-3);
+	}
+</style>
