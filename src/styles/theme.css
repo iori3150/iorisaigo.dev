@@ -36,7 +36,8 @@
 }
 
 @media (min-width: 50rem) {
-	:root {
+	:root,
+	:root[data-theme='light'] {
 		--sl-text-body: 1.03125rem; /* 16.5px */
 		--sl-text-h1: 2.375rem; /* 38px */
 		--sl-text-h2: 1.5rem;
