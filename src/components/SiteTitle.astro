@@ -34,10 +34,14 @@ const label = lang === 'ja' ? 'ノートの一覧' : 'Note list';
 	const sync = () => button?.setAttribute('aria-expanded', String(!root.hasAttribute('data-sidebar-hidden')));
 	sync();
 
-	// 本文と右の目次は幅を少しずつ変えずに（行を折り返し直さずに）滑らせる。
-	// 動きの途中は開いた状態の幅で組み（theme.css）、測った位置の差を transform で埋める
+	// 本文と右の目次は、組み直すと題や段落の折り返しが変わり、縦の位置が変わる。
+	// そこで薄く消えるまで元の組み方にとどめ（data-sidebar-hold、theme.css）、行き先の組み方で薄く現れる。
+	// 組み直しは見えない間に一度だけ起きる。ヘッダーの検索欄は大きさが変わらないので、位置の差を transform で埋める
 	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-	let moving: Animation[] = [];
+	const SLIDE = 12; // 消える・現れるときの横の滑り（px）
+	const OUT = 0.4; // 全体の時間のうち、消える側の割合
+	let fades: Animation[] = [];
+	let slides: Animation[] = [];
 	let turn = 0;
 
 	button?.addEventListener('click', () => {
@@ -47,44 +51,79 @@ const label = lang === 'ja' ? 'ノートの一覧' : 'Note list';
 		const duration = (parseFloat(time) || 0) * (time.endsWith('ms') ? 1 : 1000);
 		const easing = style.getPropertyValue('--sidebar-easing').trim() || 'ease-out';
 		const animate = !reduceMotion.matches && duration > 0;
-		// 動かす要素と、位置を測る要素（本文は枠の中で中寄せされるので、枠でなく中身の左端を測る）
-		const panes = [
-			['.main-pane', '.main-pane .sl-container'],
-			['.right-sidebar', '.right-sidebar'],
-		].flatMap(([move, measure]) => {
-			const el = document.querySelector<HTMLElement>(move);
-			const ref = document.querySelector<HTMLElement>(measure);
-			return el && ref ? [{ el, left: () => ref.getBoundingClientRect().left }] : [];
-		});
-		const from = animate ? panes.map((p) => p.left()) : [];
+		const panes = ['.main-pane', '.right-sidebar'].flatMap((s) => document.querySelector<HTMLElement>(s) ?? []);
+		const search = document.querySelector<HTMLElement>('.header site-search [data-open-modal]');
 
-		moving.forEach((a) => a.cancel());
-		moving = [];
+		// 途中で押されたときは、いま見えている濃さ・位置・組み方から続ける
+		const seen = panes[0] && getComputedStyle(panes[0]);
+		const opacity = seen ? Number(seen.opacity) : 1;
+		const dx = seen && seen.transform !== 'none' ? new DOMMatrix(seen.transform).m41 : 0;
+		const searchFrom = search?.getBoundingClientRect().left ?? 0;
+		const shownLayout = root.getAttribute('data-sidebar-hold') ?? (root.hasAttribute('data-sidebar-hidden') ? 'hidden' : 'open');
+		[...fades, ...slides].forEach((a) => a.cancel());
+		fades = [];
+		slides = [];
 		const current = ++turn;
-		root.toggleAttribute('data-sidebar-animating', animate);
+
 		const hidden = root.toggleAttribute('data-sidebar-hidden');
+		root.toggleAttribute('data-sidebar-animating', animate);
+		if (animate && shownLayout !== (hidden ? 'hidden' : 'open')) root.setAttribute('data-sidebar-hold', shownLayout);
+		else root.removeAttribute('data-sidebar-hold');
 
 		if (animate) {
-			root.setAttribute('data-sidebar-measuring', '');
-			const to = panes.map((p) => p.left());
-			root.removeAttribute('data-sidebar-measuring');
-			moving = panes.map((p, i) => {
-				const at = p.left();
-				return p.el.animate(
-					[{ transform: `translateX(${from[i] - at}px)` }, { transform: `translateX(${to[i] - at}px)` }],
-					{ duration, easing, fill: 'forwards' },
+			const shift = hidden ? -SLIDE : SLIDE; // 本文が動く向き（隠すと左、戻すと右）
+			const fade = (keyframes: Keyframe[], timing: KeyframeAnimationOptions) => {
+				const list = panes.map((el) => el.animate(keyframes, timing));
+				fades.push(...list);
+				return Promise.all(list.map((a) => a.finished));
+			};
+			const fadeIn = (from: number, x: number) =>
+				fade(
+					[
+						{ opacity: from, transform: `translateX(${x}px)` },
+						{ opacity: 1, transform: 'none' },
+					],
+					{ duration: duration * (1 - OUT), easing, fill: 'backwards' },
 				);
-			});
-			// サイドバー自体の遷移（theme.css）と同じ長さ。終わったら、同じコマで行き先の組みに戻して transform を外す
-			const finished = moving.length
-				? Promise.all(moving.map((a) => a.finished))
-				: new Promise((r) => setTimeout(r, duration));
-			finished.then(
+			const shown = root.hasAttribute('data-sidebar-hold')
+				? fade(
+						[
+							{ opacity, transform: `translateX(${dx}px)` },
+							{ opacity: 0, transform: `translateX(${shift}px)` },
+						],
+						{ duration: duration * OUT * opacity, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' },
+					).then(() => {
+						if (current !== turn) throw new Error('superseded');
+						// 消えきったコマで、行き先の組み方にして現れ始める
+						root.removeAttribute('data-sidebar-hold');
+						const out = fades;
+						fades = [];
+						const next = fadeIn(0, -shift);
+						out.forEach((a) => a.cancel());
+						return next;
+					})
+				: // 行き先の組み方がもう見えている（消える途中で押し戻した）ので、そのまま濃くする
+					fadeIn(opacity, dx);
+			if (search) {
+				const to = search.getBoundingClientRect().left;
+				if (Math.abs(searchFrom - to) > 0.5) {
+					slides.push(
+						search.animate([{ transform: `translateX(${searchFrom - to}px)` }, { transform: 'none' }], {
+							duration,
+							easing,
+						}),
+					);
+				}
+			}
+			// サイドバー自体の遷移（theme.css の --sidebar-shown）も含め、全部が止まったら片付ける
+			style.getPropertyValue('--sidebar-shown');
+			const sidebar = root.getAnimations();
+			Promise.all([shown, ...[...slides, ...sidebar].map((a) => a.finished)]).then(
 				() => {
 					if (current !== turn) return;
 					root.removeAttribute('data-sidebar-animating');
-					moving.forEach((a) => a.cancel());
-					moving = [];
+					fades = [];
+					slides = [];
 				},
 				() => {},
 			);

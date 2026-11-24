@@ -115,7 +115,8 @@ h1,
 
 /* サイドバーの開閉（切り替えは src/components/SiteTitle.astro）
    --sidebar-shown（1 で開、0 で閉）は、ボタンを押したとき（data-sidebar-animating の間）だけ遷移する。
-   本文と右の目次は、SiteTitle.astro の script が transform で滑らせる */
+   本文と右の目次は、薄く消えるまで data-sidebar-hold の組み方（open か hidden）にとどめ、行き先の組み方で薄く現れる。
+   ヘッダーは押した時点で行き先の組み方にし、検索欄は SiteTitle.astro の script が transform で滑らせる */
 @property --sidebar-shown {
 	syntax: '<number>';
 	inherits: true;
@@ -126,23 +127,23 @@ h1,
 		--sidebar-shown: 0;
 		--sl-content-inline-start: 0rem;
 	}
+	:root[data-has-sidebar][data-sidebar-hold='open'] {
+		--sl-content-inline-start: var(--sl-sidebar-width);
+	}
+	:root[data-has-sidebar][data-sidebar-hold='hidden'] {
+		--sl-content-inline-start: 0rem;
+	}
+	:root[data-has-sidebar][data-sidebar-hold] .header {
+		--sl-content-inline-start: var(--sl-sidebar-width);
+	}
+	:root[data-has-sidebar][data-sidebar-hold][data-sidebar-hidden] .header {
+		--sl-content-inline-start: 0rem;
+	}
 	.sidebar-pane {
 		transform: translateX(calc((var(--sidebar-shown) - 1) * 100%));
 	}
 	:root[data-sidebar-hidden]:not([data-sidebar-animating]) .sidebar-pane {
 		visibility: hidden;
-	}
-	/* 動きの途中：ヘッダーの列は変数に合わせて動かし、本文の枠は開いた状態の幅で組む
-	   （隠すときに広がった本文が右の目次に重ならないよう、組み直しは隠れた側の端で一度だけ）。
-	   data-sidebar-measuring は、動かす前に行き先の位置を測る一瞬だけ付く */
-	:root[data-has-sidebar][data-sidebar-animating] {
-		--sl-content-inline-start: calc(var(--sl-sidebar-width) * var(--sidebar-shown));
-	}
-	:root[data-sidebar-animating] .main-frame {
-		padding-inline-start: var(--sl-sidebar-width);
-	}
-	:root[data-sidebar-animating][data-sidebar-measuring][data-sidebar-hidden] .main-frame {
-		padding-inline-start: 0rem;
 	}
 }
 @media (min-width: 50rem) and (prefers-reduced-motion: no-preference) {
