@@ -112,3 +112,13 @@ h1,
 	font-size: 0.875rem;
 	color: var(--sl-color-gray-3);
 }
+
+/* サイドバーを隠した状態（切り替えは src/components/SiteTitle.astro） */
+@media (min-width: 50rem) {
+	:root[data-has-sidebar][data-sidebar-hidden] {
+		--sl-content-inline-start: 0rem;
+	}
+	:root[data-sidebar-hidden] .sidebar-pane {
+		display: none;
+	}
+}

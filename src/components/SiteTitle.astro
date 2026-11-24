@@ -1,0 +1,81 @@
+---
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+
+// サイドバーが出る幅（50rem 以上）でだけ、サイドバーを隠すボタンを置く。
+// 状態は <html data-sidebar-hidden> で表し、描画前の当てかたは astro.config.mjs の head にある
+const { hasSidebar, lang } = Astro.locals.starlightRoute;
+const label = lang === 'ja' ? 'ノートの一覧' : 'Note list';
+---
+
+{
+	hasSidebar && (
+		<button
+			type="button"
+			class="sidebar-toggle print:hidden"
+			aria-label={label}
+			title={label}
+			aria-controls="starlight__sidebar"
+			aria-expanded="true"
+		>
+			<svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none">
+				<rect x="2.5" y="3.5" width="15" height="13" rx="2" stroke="currentColor" stroke-width="1.5" />
+				<path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.5" />
+				<path class="pane" d="M4 5h3.5v10H4z" fill="currentColor" />
+			</svg>
+		</button>
+	)
+}
+<Default />
+
+<script>
+	const KEY = 'sidebar-hidden';
+	const root = document.documentElement;
+	const button = document.querySelector<HTMLButtonElement>('.sidebar-toggle');
+	const sync = () => button?.setAttribute('aria-expanded', String(!root.hasAttribute('data-sidebar-hidden')));
+	sync();
+	button?.addEventListener('click', () => {
+		const hidden = root.toggleAttribute('data-sidebar-hidden');
+		try {
+			if (hidden) localStorage.setItem(KEY, '1');
+			else localStorage.removeItem(KEY);
+		} catch {}
+		sync();
+	});
+</script>
+
+<style>
+	.sidebar-toggle {
+		display: none;
+	}
+	@media (min-width: 50rem) {
+		.sidebar-toggle {
+			display: inline-flex;
+			flex-shrink: 0;
+			align-items: center;
+			justify-content: center;
+			width: 2.25rem;
+			height: 2.25rem;
+			margin-inline-end: 0.5rem;
+			padding: 0;
+			border: 0;
+			border-radius: 0.375rem;
+			background: transparent;
+			color: var(--sl-color-gray-3);
+			cursor: pointer;
+		}
+		.sidebar-toggle:hover {
+			background-color: var(--sl-color-gray-6);
+			color: var(--sl-color-white);
+		}
+		.sidebar-toggle:focus-visible {
+			outline: 2px solid var(--sl-color-accent);
+			outline-offset: 1px;
+		}
+		.sidebar-toggle[aria-expanded='true'] {
+			color: var(--sl-color-accent);
+		}
+		.sidebar-toggle[aria-expanded='false'] .pane {
+			display: none;
+		}
+	}
+</style>
