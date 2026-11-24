@@ -33,8 +33,62 @@ const label = lang === 'ja' ? 'ノートの一覧' : 'Note list';
 	const button = document.querySelector<HTMLButtonElement>('.sidebar-toggle');
 	const sync = () => button?.setAttribute('aria-expanded', String(!root.hasAttribute('data-sidebar-hidden')));
 	sync();
+
+	// 本文と右の目次は幅を少しずつ変えずに（行を折り返し直さずに）滑らせる。
+	// 動きの途中は開いた状態の幅で組み（theme.css）、測った位置の差を transform で埋める
+	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+	let moving: Animation[] = [];
+	let turn = 0;
+
 	button?.addEventListener('click', () => {
+		const style = getComputedStyle(root);
+		// CSS の圧縮で 240ms が .24s になるので、単位を見て ms にする
+		const time = style.getPropertyValue('--sidebar-duration').trim();
+		const duration = (parseFloat(time) || 0) * (time.endsWith('ms') ? 1 : 1000);
+		const easing = style.getPropertyValue('--sidebar-easing').trim() || 'ease-out';
+		const animate = !reduceMotion.matches && duration > 0;
+		// 動かす要素と、位置を測る要素（本文は枠の中で中寄せされるので、枠でなく中身の左端を測る）
+		const panes = [
+			['.main-pane', '.main-pane .sl-container'],
+			['.right-sidebar', '.right-sidebar'],
+		].flatMap(([move, measure]) => {
+			const el = document.querySelector<HTMLElement>(move);
+			const ref = document.querySelector<HTMLElement>(measure);
+			return el && ref ? [{ el, left: () => ref.getBoundingClientRect().left }] : [];
+		});
+		const from = animate ? panes.map((p) => p.left()) : [];
+
+		moving.forEach((a) => a.cancel());
+		moving = [];
+		const current = ++turn;
+		root.toggleAttribute('data-sidebar-animating', animate);
 		const hidden = root.toggleAttribute('data-sidebar-hidden');
+
+		if (animate) {
+			root.setAttribute('data-sidebar-measuring', '');
+			const to = panes.map((p) => p.left());
+			root.removeAttribute('data-sidebar-measuring');
+			moving = panes.map((p, i) => {
+				const at = p.left();
+				return p.el.animate(
+					[{ transform: `translateX(${from[i] - at}px)` }, { transform: `translateX(${to[i] - at}px)` }],
+					{ duration, easing, fill: 'forwards' },
+				);
+			});
+			// サイドバー自体の遷移（theme.css）と同じ長さ。終わったら、同じコマで行き先の組みに戻して transform を外す
+			const finished = moving.length
+				? Promise.all(moving.map((a) => a.finished))
+				: new Promise((r) => setTimeout(r, duration));
+			finished.then(
+				() => {
+					if (current !== turn) return;
+					root.removeAttribute('data-sidebar-animating');
+					moving.forEach((a) => a.cancel());
+					moving = [];
+				},
+				() => {},
+			);
+		}
 		try {
 			if (hidden) localStorage.setItem(KEY, '1');
 			else localStorage.removeItem(KEY);
@@ -60,22 +114,42 @@ const label = lang === 'ja' ? 'ノートの一覧' : 'Note list';
 			border: 0;
 			border-radius: 0.375rem;
 			background: transparent;
-			color: var(--sl-color-gray-3);
+			color: var(--sl-color-accent);
 			cursor: pointer;
 		}
 		.sidebar-toggle:hover {
 			background-color: var(--sl-color-gray-6);
-			color: var(--sl-color-white);
 		}
 		.sidebar-toggle:focus-visible {
 			outline: 2px solid var(--sl-color-accent);
 			outline-offset: 1px;
 		}
-		.sidebar-toggle[aria-expanded='true'] {
-			color: var(--sl-color-accent);
+		/* 状態は描画前に当たる <html data-sidebar-hidden> で見る（開いた直後に動かさない） */
+		.pane {
+			transform-box: fill-box;
+			transform-origin: left center;
 		}
-		.sidebar-toggle[aria-expanded='false'] .pane {
-			display: none;
+		:global(:root[data-sidebar-hidden]) .sidebar-toggle {
+			color: var(--sl-color-gray-3);
+		}
+		:global(:root[data-sidebar-hidden]) .sidebar-toggle:hover {
+			color: var(--sl-color-white);
+		}
+		:global(:root[data-sidebar-hidden]) .pane {
+			transform: scaleX(0);
+			opacity: 0;
+		}
+	}
+	@media (min-width: 50rem) and (prefers-reduced-motion: no-preference) {
+		.sidebar-toggle {
+			transition:
+				color var(--sidebar-duration) var(--sidebar-easing),
+				background-color 120ms;
+		}
+		.pane {
+			transition:
+				transform var(--sidebar-duration) var(--sidebar-easing),
+				opacity var(--sidebar-duration) var(--sidebar-easing);
 		}
 	}
 </style>

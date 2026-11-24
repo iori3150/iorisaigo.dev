@@ -113,12 +113,44 @@ h1,
 	color: var(--sl-color-gray-3);
 }
 
-/* サイドバーを隠した状態（切り替えは src/components/SiteTitle.astro） */
+/* サイドバーの開閉（切り替えは src/components/SiteTitle.astro）
+   --sidebar-shown（1 で開、0 で閉）は、ボタンを押したとき（data-sidebar-animating の間）だけ遷移する。
+   本文と右の目次は、SiteTitle.astro の script が transform で滑らせる */
+@property --sidebar-shown {
+	syntax: '<number>';
+	inherits: true;
+	initial-value: 1;
+}
 @media (min-width: 50rem) {
 	:root[data-has-sidebar][data-sidebar-hidden] {
+		--sidebar-shown: 0;
 		--sl-content-inline-start: 0rem;
 	}
-	:root[data-sidebar-hidden] .sidebar-pane {
-		display: none;
+	.sidebar-pane {
+		transform: translateX(calc((var(--sidebar-shown) - 1) * 100%));
 	}
+	:root[data-sidebar-hidden]:not([data-sidebar-animating]) .sidebar-pane {
+		visibility: hidden;
+	}
+	/* 動きの途中：ヘッダーの列は変数に合わせて動かし、本文の枠は開いた状態の幅で組む
+	   （隠すときに広がった本文が右の目次に重ならないよう、組み直しは隠れた側の端で一度だけ）。
+	   data-sidebar-measuring は、動かす前に行き先の位置を測る一瞬だけ付く */
+	:root[data-has-sidebar][data-sidebar-animating] {
+		--sl-content-inline-start: calc(var(--sl-sidebar-width) * var(--sidebar-shown));
+	}
+	:root[data-sidebar-animating] .main-frame {
+		padding-inline-start: var(--sl-sidebar-width);
+	}
+	:root[data-sidebar-animating][data-sidebar-measuring][data-sidebar-hidden] .main-frame {
+		padding-inline-start: 0rem;
+	}
+}
+@media (min-width: 50rem) and (prefers-reduced-motion: no-preference) {
+	:root[data-sidebar-animating] {
+		transition: --sidebar-shown var(--sidebar-duration) var(--sidebar-easing);
+	}
+}
+:root {
+	--sidebar-duration: 240ms;
+	--sidebar-easing: cubic-bezier(0.2, 0, 0, 1);
 }
