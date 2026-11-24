@@ -1,0 +1,98 @@
+---
+// 図 6：推定した W を繰り返し掛けて時間を進め、陽解法と重ねる。再生ボタンかスライダーで時刻を動かす
+import { ui, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+	initial?: number;
+}
+const { lang = 'ja', initial = 10 } = Astro.props;
+const t = ui[lang];
+---
+
+<div class="dmd-roll" data-t={JSON.stringify(t)} data-initial={initial}>
+	<div class="lm-legend">
+		<span style="--c: #c4581c" class="dot">{t.solver}</span>
+		<span style="--c: #2350d8">{t.dmdFull}</span>
+		<span style="--c: #16866a" class="dash">{t.dmdRank}</span>
+	</div>
+	<svg viewBox="0 0 720 250" role="img" aria-label="陽解法の分布と、W を n 回掛けた分布の重ね合わせ"></svg>
+	<div class="lm-controls">
+		<button type="button" class="lm-btn" data-play>{t.play}</button>
+		<label>{t.step} n<input type="range" min="0" max="60" step="1" value={initial} data-step /><output data-step-out></output></label>
+	</div>
+	<div class="lm-readout" data-readout aria-live="off"></div>
+</div>
+
+<style is:global>
+	.lm-legend span.dot::before {
+		width: 0.5rem;
+		height: 0.5rem;
+		border: none;
+		border-radius: 50%;
+		background: var(--c);
+	}
+</style>
+
+<script>
+	import data from './data.json';
+	import { el, text, clear, fmt, profileFrame, polyline } from '../learned-taxonomy/draw';
+
+	const C = { solver: '#c4581c', dmd: '#2350d8', exact: '#16866a' };
+	const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const roll = data.roll as { ref: number[][]; ranks: Record<string, { pred: number[][]; err: number[] }> };
+
+	for (const root of document.querySelectorAll<HTMLElement>('.dmd-roll')) {
+		const t = JSON.parse(root.dataset.t!);
+		const svg = root.querySelector('svg')!;
+		const slider = root.querySelector<HTMLInputElement>('[data-step]')!;
+		const out = root.querySelector('[data-step-out]')!;
+		const readout = root.querySelector('[data-readout]')!;
+		const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+		const box = { x0: 44, x1: 700, y0: 16, y1: 206 };
+		let timer = 0;
+
+		function draw(n: number) {
+			clear(svg);
+			const { sx, sy } = profileFrame(svg, box, 0, 1, [0, 0.5, 1]);
+			const x = data.x as number[];
+			const pts = (u: number[]) => polyline(x.map((xi, i) => [sx(xi), sy(u[i])]));
+			el('polyline', { points: pts(roll.ranks['6'].pred[n]), fill: 'none', stroke: C.exact, 'stroke-width': 2, 'stroke-dasharray': '5 3' }, svg);
+			el('polyline', { points: pts(roll.ranks['16'].pred[n]), fill: 'none', stroke: C.dmd, 'stroke-width': 2 }, svg);
+			roll.ref[n].forEach((u, i) => el('circle', { cx: sx(x[i]), cy: sy(u), r: 3.5, fill: '#fff', stroke: C.solver, 'stroke-width': 1.5 }, svg));
+			out.textContent = String(n);
+			readout.replaceChildren();
+			for (const [label, v] of [[t.dmdFull, roll.ranks['16'].err[n]], [t.dmdRank, roll.ranks['6'].err[n]]] as [string, number][]) {
+				const s = document.createElement('span');
+				s.append(`${label}　${t.errorRms} `);
+				const b = document.createElement('b');
+				b.textContent = fmt(v);
+				s.append(b);
+				readout.append(s);
+			}
+		}
+		function stop() {
+			clearInterval(timer);
+			timer = 0;
+			btn.textContent = t.play;
+		}
+		btn.addEventListener('click', () => {
+			if (timer) return stop();
+			if (+slider.value >= 60) slider.value = '0';
+			btn.textContent = t.pause;
+			timer = window.setInterval(() => {
+				const n = +slider.value + 1;
+				slider.value = String(n);
+				draw(n);
+				if (n >= 60) stop();
+			}, 120);
+		});
+		// 動きを減らす設定のときは自動再生を付けず、スライダーだけで動かす
+		if (reduce) btn.hidden = true;
+		slider.addEventListener('input', () => {
+			stop();
+			draw(+slider.value);
+		});
+		draw(+slider.value);
+	}
+</script>

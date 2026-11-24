@@ -46,19 +46,38 @@ const refs: Ref[] = [
 	{ key: 'wang2026', year: 2026, authors: 'Wang, C., Guo, M., Chen, S., et al.', title: 'WorldParticle: Unified world simulation of Lagrangian particle dynamics via transformer', venue: 'arXiv:2605.15305（2026 年 11 月時点で、arXiv のページに掲載先の記載はない）', url: 'https://arxiv.org/abs/2605.15305' },
 ];
 
+// 第 IV 部 1 章（DMD）だけが引く文献。IV-0 の全件の一覧には入れない
+const dmdRefs: Ref[] = [
+	{ key: 'koopman1931', year: 1931, authors: 'Koopman, B. O.', title: 'Hamiltonian systems and transformation in Hilbert space', venue: 'Proceedings of the National Academy of Sciences, 17(5), 315–318', url: 'https://doi.org/10.1073/pnas.17.5.315' },
+	{ key: 'mezic2005', year: 2005, authors: 'Mezić, I.', title: 'Spectral properties of dynamical systems, model reduction and decompositions', venue: 'Nonlinear Dynamics, 41(1–3), 309–325', url: 'https://doi.org/10.1007/s11071-005-2824-x' },
+	{ key: 'rowley2009', year: 2009, authors: 'Rowley, C. W., Mezić, I., Bagheri, S., Schlatter, P., & Henningson, D. S.', title: 'Spectral analysis of nonlinear flows', venue: 'Journal of Fluid Mechanics, 641, 115–127（参照したのは要旨）', url: 'https://doi.org/10.1017/S0022112009992059' },
+	{ key: 'schmid2010', year: 2010, authors: 'Schmid, P. J.', title: 'Dynamic mode decomposition of numerical and experimental data', venue: 'Journal of Fluid Mechanics, 656, 5–28（参照したのは要旨）', url: 'https://doi.org/10.1017/S0022112010001217' },
+	{ key: 'tu2014', year: 2014, authors: 'Tu, J. H., Rowley, C. W., Luchtenburg, D. M., Brunton, S. L., & Kutz, J. N.', title: 'On dynamic mode decomposition: Theory and applications', venue: 'Journal of Computational Dynamics, 1(2), 391–421（節は arXiv v1 による）', url: 'https://arxiv.org/abs/1312.0041' },
+	{ key: 'brunton2016', year: 2016, authors: 'Brunton, S. L., Proctor, J. L., & Kutz, J. N.', title: 'Discovering governing equations from data by sparse identification of nonlinear dynamical systems', venue: 'Proceedings of the National Academy of Sciences, 113(15), 3932–3937（節は arXiv v1 による）', url: 'https://arxiv.org/abs/1509.03580' },
+	{ key: 'taira2017', year: 2017, authors: 'Taira, K., Brunton, S. L., Dawson, S. T. M., Rowley, C. W., Colonius, T., McKeon, B. J., Schmidt, O. T., Gordeyev, S., Theofilis, V., & Ukeiley, L. S.', title: 'Modal analysis of fluid flows: An overview', venue: 'AIAA Journal, 55(12), 4013–4041（節は arXiv 版による）', url: 'https://arxiv.org/abs/1702.01453' },
+];
+
+const byYear = (list: Ref[]): Ref[] =>
+	list
+		.map((r, i) => ({ r, i }))
+		.sort((a, b) => a.r.year - b.r.year || a.i - b.i)
+		.map(({ r }) => r);
+
 // 年の古い順（同じ年は上の並び順のまま）
 export const sorted: Ref[] = refs
 	.map((r, i) => ({ r, i }))
 	.sort((a, b) => a.r.year - b.r.year || a.i - b.i)
 	.map(({ r }) => r);
+const sortedAll = byYear([...refs, ...dmdRefs]);
 
 // ページごとの参考文献（番号はそのページの中で年の古い順に振り直す）。載っていないページ（IV-0）は全件
 export const pageRefs: Record<string, string[]> = {
-	'learned/01-taxonomy': ['tompson2017', 'raissi2019', 'sanchez2020', 'pfaff2021', 'li2021fno', 'lu2021', 'brandstetter2022', 'wu2024'],
+	'learned/01-dmd': ['sirovich1987', 'koopman1931', 'mezic2005', 'rowley2009', 'schmid2010', 'tu2014', 'sanchez2020', 'brunton2016', 'taira2017'],
+	'learned/07-taxonomy': ['tompson2017', 'raissi2019', 'sanchez2020', 'pfaff2021', 'li2021fno', 'lu2021', 'brandstetter2022', 'wu2024'],
 };
 export const listFor = (page?: string): Ref[] => {
 	const keys = page ? pageRefs[page] : undefined;
-	return keys ? sorted.filter((r) => keys.includes(r.key)) : sorted;
+	return keys ? sortedAll.filter((r) => keys.includes(r.key)) : sorted;
 };
 
 export const numberOf = (key: string, page?: string): number => {

@@ -1,0 +1,136 @@
+---
+// 図 2：モード分解と Koopman 作用素から DMD へ。年表（静止画）。各項目の根拠は引用の印
+import { numberOf } from '../learned-map/refs';
+
+interface Props {
+	page: string;
+}
+const { page } = Astro.props;
+
+type Cite = { k: string; at?: string };
+type Item = { year: string; lane: 0 | 1 | 2; label: string; text: string; cites: Cite[] };
+const lanes = ['モードの取り出し', 'Koopman 作用素', 'DMD とその先'];
+const items: Item[] = [
+	{ year: '1931', lane: 1, label: 'Koopman', text: 'ハミルトン系の力学を、状態の関数に働く無限次元の線形作用素で表した', cites: [{ k: 'koopman1931' }, { k: 'taira2017', at: '§VI' }] },
+	{ year: '1967', lane: 0, label: 'Lumley', text: '固有直交分解（POD: Proper Orthogonal Decomposition）を流体・乱流の分野に持ち込んだ', cites: [{ k: 'taira2017', at: '§III' }] },
+	{ year: '1987', lane: 0, label: 'Sirovich', text: 'スナップショット法：点の数より小さい時間方向の相関行列から、同じ空間モードを求める', cites: [{ k: 'sirovich1987' }, { k: 'taira2017', at: '§III' }] },
+	{ year: '2005', lane: 1, label: 'Mezić', text: 'Koopman 作用素のスペクトル分解を、データからのモード分解とモデル縮約に使うことを提案した', cites: [{ k: 'tu2014', at: '§1' }, { k: 'mezic2005' }] },
+	{ year: '2008', lane: 2, label: 'Schmid ら', text: 'DMD を学会講演（APS 流体力学部会）で最初に紹介した', cites: [{ k: 'taira2017', at: '§V' }, { k: 'tu2014', at: '§2' }] },
+	{ year: '2009', lane: 1, label: 'Rowley ら', text: 'Koopman モードをデータから求める方法として DMD を位置づけた', cites: [{ k: 'rowley2009' }] },
+	{ year: '2010', lane: 2, label: 'Schmid', text: '数値・実験のデータから動的モードを取り出す方法として、DMD の論文を発表した', cites: [{ k: 'schmid2010' }] },
+	{ year: '2014', lane: 2, label: 'Tu ら', text: 'DMD を「データを近似する線形演算子の固有分解」と定義し、連続していない組にも広げた（exact DMD）', cites: [{ k: 'tu2014', at: '§2.2' }] },
+	{ year: '2016', lane: 2, label: 'Brunton ら', text: '線形の回帰である DMD に対し、非線形の項を疎な回帰で選ぶ SINDy を提案した', cites: [{ k: 'brunton2016', at: '§1' }] },
+];
+const mark = (c: Cite) => ({ href: `#ref-${c.k}`, text: `[${numberOf(c.k, page)}${c.at ? ` ${c.at}` : ''}]` });
+---
+
+<div class="dmd-history">
+	<div class="head" aria-hidden="true">
+		<span></span>
+		{lanes.map((l, i) => <span class={`lane l${i}`}>{l}</span>)}
+	</div>
+	<ol>
+		{
+			items.map((it) => (
+				<li>
+					<span class="year">{it.year}</span>
+					<span class={`body l${it.lane}`} style={`grid-column: ${it.lane + 2}`}>
+						<b class="who">{it.label}</b>
+						<span class={`tag l${it.lane}`}>{lanes[it.lane]}</span>
+						{it.text}
+						{it.cites.map((c) => <a class="lm-cite" href={mark(c).href}>{mark(c).text}</a>)}
+					</span>
+				</li>
+			))
+		}
+	</ol>
+</div>
+
+<style>
+	.dmd-history {
+		--l0: #5c6b7c;
+		--l1: #16866a;
+		--l2: #2350d8;
+		font-size: 0.875rem;
+		line-height: 1.65;
+	}
+	.head,
+	li {
+		display: grid;
+		grid-template-columns: 3rem repeat(3, 1fr);
+		column-gap: 0.75rem;
+	}
+	.head {
+		font-weight: 600;
+		border-bottom: 1px solid #d9e0e6;
+		padding-bottom: 0.35rem;
+		margin-bottom: 0.25rem;
+	}
+	ol {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	li {
+		position: relative;
+		padding: 0.45rem 0;
+		border-bottom: 1px solid #ebeff2;
+	}
+	.year {
+		grid-column: 1;
+		grid-row: 1;
+		font-variant-numeric: tabular-nums;
+		font-weight: 600;
+	}
+	.body {
+		grid-row: 1;
+	}
+	.lane.l0,
+	.tag.l0 {
+		color: var(--l0);
+	}
+	.lane.l1,
+	.tag.l1 {
+		color: var(--l1);
+	}
+	.lane.l2,
+	.tag.l2 {
+		color: var(--l2);
+	}
+	.who {
+		display: block;
+	}
+	.tag {
+		display: none;
+		font-size: 0.75rem;
+		margin: 0 0.5em;
+	}
+	li .body {
+		border-left: 3px solid var(--l0);
+		padding-left: 0.6rem;
+		color: #15233d;
+	}
+	li .body.l1 {
+		border-left-color: var(--l1);
+	}
+	li .body.l2 {
+		border-left-color: var(--l2);
+	}
+	@media (max-width: 40rem) {
+		.head {
+			display: none;
+		}
+		li {
+			grid-template-columns: 3rem 1fr;
+		}
+		.body {
+			grid-column: 2 !important;
+		}
+		.who {
+		display: block;
+	}
+	.tag {
+			display: inline;
+		}
+	}
+</style>

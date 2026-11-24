@@ -3,15 +3,15 @@ title: 学習型シミュレーターの分類
 description: 格子点 16 個の 1 次元拡散を、近似の対象、状態の表現、教師と損失、推論の方式の 4 つの軸で学習させ分け、ページの中で計算して比べる。最後に主な手法を同じ 4 軸の表に並べる。
 ---
 
-import Figure from '../../../../components/learned-map/Figure.astro';
-import Cite from '../../../../components/learned-map/Cite.astro';
-import Refs from '../../../../components/learned-map/Refs.astro';
-import Targets from '../../../../components/learned-taxonomy/Targets.astro';
-import Representation from '../../../../components/learned-taxonomy/Representation.astro';
-import OutputForm from '../../../../components/learned-taxonomy/OutputForm.astro';
-import Supervision from '../../../../components/learned-taxonomy/Supervision.astro';
-import Inference from '../../../../components/learned-taxonomy/Inference.astro';
-import Taxonomy from '../../../../components/learned-taxonomy/Taxonomy.astro';
+import Figure from '../components/learned-map/Figure.astro';
+import Cite from '../components/learned-map/Cite.astro';
+import Refs from '../components/learned-map/Refs.astro';
+import Targets from '../components/learned-taxonomy/Targets.astro';
+import Representation from '../components/learned-taxonomy/Representation.astro';
+import OutputForm from '../components/learned-taxonomy/OutputForm.astro';
+import Supervision from '../components/learned-taxonomy/Supervision.astro';
+import Inference from '../components/learned-taxonomy/Inference.astro';
+import Taxonomy from '../components/learned-taxonomy/Taxonomy.astro';
 
 学習型シミュレーターは、何をニューラルネットワークで近似するか、状態をどう表すか、何を教師にして何を損失にするか、推論でモデルを時間方向に何回つないで評価するか、の 4 つの軸で整理できる。
 
@@ -187,7 +187,7 @@ Transformer 系の Transolver は、メッシュの点を学習したスライ�
 スライスの数と特徴の次元を固定すれば、この注意の計算量は点の数 $N$ に比例する<Cite k="wu2024" at="§3.2" />。
 
 <Figure n={6}>
-	<Taxonomy page="learned/01-taxonomy" />
+	<Taxonomy page="learned/07-taxonomy" />
 	<Fragment slot="caption">
 		主な手法を、近似の対象、状態の表現と出力、教師と損失、推論の方式の 4 つの軸で並べた表。各マスの引用の印は、原論文の該当する節。
 	</Fragment>

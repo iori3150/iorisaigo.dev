@@ -22,6 +22,9 @@ export default defineConfig({
 		// 旧 URL（章名を「地図」にしていたとき）
 		'/ja/learned/00-map/': '/ja/learned/00-overview/',
 		'/en/learned/00-map/': '/en/learned/00-overview/',
+		// 分類の章は 7 章に回した
+		'/ja/learned/01-taxonomy/': '/ja/learned/01-dmd/',
+		'/en/learned/01-taxonomy/': '/en/learned/01-dmd/',
 	},
 	markdown: {
 		remarkPlugins: [remarkMath, remarkCiteIndex],
@@ -44,7 +47,7 @@ export default defineConfig({
 					translations: { en: 'Part IV  Learned simulators' },
 					items: [
 						{ label: '0　概観', translations: { en: '0  Overview' }, slug: 'learned/00-overview' },
-						{ label: '1　学習型シミュレーターの分類', translations: { en: '1  A taxonomy of learned simulators' }, slug: 'learned/01-taxonomy' },
+						{ label: '1　動的モード分解', translations: { en: '1  Dynamic mode decomposition' }, slug: 'learned/01-dmd' },
 					],
 				},
 			],

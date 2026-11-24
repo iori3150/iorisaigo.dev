@@ -12,6 +12,7 @@ const overview: Record<string, string[]> = {
 
 // ページごとの図の中の引用。載っていないページ（IV-0）は overview
 const byPage: Record<string, Record<string, string[]>> = {
-	'learned/01-taxonomy': { 'fig-6': uniq(taxonomyCites()) },
+	'learned/01-dmd': { 'fig-2': ['koopman1931', 'taira2017', 'sirovich1987', 'tu2014', 'mezic2005', 'rowley2009', 'schmid2010', 'brunton2016'] },
+	'learned/07-taxonomy': { 'fig-6': uniq(taxonomyCites()) },
 };
 export const figureCitesFor = (page?: string) => (page && byPage[page]) || overview;
