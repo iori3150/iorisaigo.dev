@@ -1,0 +1,67 @@
+---
+// 図 5：同じ 21 枚のスナップショットから求めた POD のモードと DMD のモード（静止画）。
+// 上：モードの形。下：各モードの時間係数（絶対値の最大で割る）。向きは時間係数が n = 0 で正になるようにそろえる。POD の係数は符号を変えることがあり、DMD の係数は λⁿ に比例する
+import { data, pts, COLORS } from './fig';
+
+const { pod, dmd } = data.podDmd;
+const shade = ['#15233d', COLORS.dmd, COLORS.solver];
+const pw = 230, ph = 120, gx = 60, left = 40;
+const col = [left, left + pw + gx];
+const rowY = [44, 268];
+const ns = Array.from({ length: 21 }, (_, n) => n);
+const norm = (c: number[]) => {
+	const m = Math.max(...c.map(Math.abs));
+	return c.map((v) => v / m);
+};
+const panels = [
+	{ c: 0, r: 0, title: 'POD のモード φⱼ', lines: pod.modes, xs: data.x, kind: 'x' },
+	{ c: 1, r: 0, title: 'DMD のモード vⱼ', lines: dmd.modes, xs: data.x, kind: 'x' },
+	{ c: 0, r: 1, title: 'POD の時間係数 aⱼ(n)', lines: pod.coef.map(norm), xs: ns, kind: 'n' },
+	{ c: 1, r: 1, title: 'DMD の時間係数 cⱼ λⱼⁿ', lines: dmd.coef.map(norm), xs: ns, kind: 'n' },
+];
+const legend = [
+	['POD 1（エネルギー 96%）', 'POD 2（3.4%）', 'POD 3（0.3%）'],
+	dmd.lam.map((l: number, j: number) => `DMD ${j + 1}（λ = ${l.toFixed(3)}）`),
+];
+---
+
+<svg viewBox="0 0 560 450" role="img" aria-label="同じスナップショットから求めた POD と DMD のモードの形と時間係数。POD の時間係数は途中で符号を変え、DMD の時間係数は一定の比で減衰する">
+	{
+		panels.map((p) => {
+			const x0 = col[p.c], y0 = rowY[p.r];
+			const xmax = p.kind === 'x' ? 1 : 20;
+			const sx = (v: number) => x0 + (pw * v) / xmax;
+			const sy = (v: number) => y0 + ph / 2 - (ph / 2) * v;
+			return (
+				<g>
+					<text x={x0} y={y0 - 14} font-size="12" font-weight="600" fill={COLORS.text}>{p.title}</text>
+					<line x1={x0} x2={x0 + pw} y1={sy(0)} y2={sy(0)} stroke={COLORS.rule} />
+					<line x1={x0} x2={x0} y1={sy(1)} y2={sy(-1)} stroke={COLORS.rule} />
+					{p.lines.map((ys: number[], j: number) => (
+						<polyline points={pts(p.xs, ys, sx, sy)} fill="none" stroke={shade[j]} stroke-width="1.8" />
+					))}
+					<g font-size="10" fill={COLORS.muted}>
+						<text x={x0 - 5} y={sy(1) + 4} text-anchor="end">1</text>
+						<text x={x0 - 5} y={sy(0) + 4} text-anchor="end">0</text>
+						<text x={x0 - 5} y={sy(-1) + 4} text-anchor="end">−1</text>
+						<text x={x0} y={sy(-1) + 14} text-anchor="middle">0</text>
+						<text x={x0 + pw} y={sy(-1) + 14} text-anchor="middle">{xmax}</text>
+						<text x={x0 + pw / 2} y={sy(-1) + 14} text-anchor="middle">{p.kind === 'x' ? 'x' : '時刻のステップ n'}</text>
+					</g>
+				</g>
+			);
+		})
+	}
+	{
+		legend.map((items, c) => (
+			<g font-size="10.5" fill={COLORS.text}>
+				{items.map((label: string, j: number) => (
+					<g>
+						<line x1={col[c]} x2={col[c] + 18} y1={rowY[0] + ph + 30 + j * 15} y2={rowY[0] + ph + 30 + j * 15} stroke={shade[j]} stroke-width="1.8" />
+						<text x={col[c] + 23} y={rowY[0] + ph + 34 + j * 15}>{label}</text>
+					</g>
+				))}
+			</g>
+		))
+	}
+</svg>

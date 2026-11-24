@@ -1,0 +1,49 @@
+---
+// 図 1：棒の温度のスナップショットを時刻の順に並べる（静止画）。最後のこまは次の時刻で、まだ分からない
+import { data, sequential, pts, COLORS } from './fig';
+
+const shown = [0, 1, 2, 3, 4];
+const pw = 140, ph = 70, gap = 20, left = 14, top = 26, rowH = 136;
+const panels = [...shown, 5].map((n, k) => ({ n, x0: left + (k % 3) * (pw + gap), y0: top + Math.floor(k / 3) * rowH }));
+const rodH = 12;
+---
+
+<svg viewBox="0 0 480 298" role="img" aria-label="両端を温度 0 に保った棒の温度分布を、時刻 n = 0 から 4 まで並べた図。n = 5 のこまは空">
+	{
+		panels.map(({ n, x0, y0 }) => {
+			const sx = (x: number) => x0 + pw * x;
+			const sy = (u: number) => y0 + ph - ph * u;
+			const known = shown.includes(n);
+			const u = known ? data.traj1[n] : [];
+			const cw = pw / 16;
+			return (
+				<g>
+					<text x={x0} y={y0 - 10} font-size="12" font-weight="600" fill={COLORS.text}>n = {n}</text>
+					<line x1={x0} x2={x0 + pw} y1={sy(0)} y2={sy(0)} stroke={COLORS.rule} />
+					<line x1={x0} x2={x0} y1={sy(1)} y2={sy(0)} stroke={COLORS.rule} />
+					{known ? (
+						<>
+							<polyline points={pts(data.x, u, sx, sy)} fill="none" stroke={COLORS.dmd} stroke-width="1.5" />
+							{data.x.map((x, i) => <circle cx={sx(x)} cy={sy(u[i])} r="2.2" fill={COLORS.dmd} />)}
+							{u.map((v, i) => <rect x={x0 + i * cw} y={sy(0) + 8} width={cw} height={rodH} fill={sequential(v, 1)} />)}
+						</>
+					) : (
+						<>
+							<rect x={x0} y={sy(1)} width={pw} height={ph + 8 + rodH} fill="none" stroke={COLORS.faint} stroke-dasharray="4 3" />
+							<text x={x0 + pw / 2} y={sy(0.5) + 12} font-size="30" fill={COLORS.faint} text-anchor="middle">?</text>
+						</>
+					)}
+					<rect x={x0} y={sy(0) + 8} width={pw} height={rodH} fill="none" stroke={COLORS.muted} />
+					<rect x={x0 - 4} y={sy(0) + 8} width="4" height={rodH} fill={COLORS.muted} />
+					<rect x={x0 + pw} y={sy(0) + 8} width="4" height={rodH} fill={COLORS.muted} />
+				</g>
+			);
+		})
+	}
+	<g font-size="10" fill={COLORS.muted}>
+		<text x={left + 3} y={top + 4}>1</text>
+		<text x={left + 3} y={top + ph - 3}>0</text>
+		<text x={left} y={top + ph + 8 + rodH + 12} text-anchor="middle">x = 0</text>
+		<text x={left + pw} y={top + ph + 8 + rodH + 12} text-anchor="middle">x = 1</text>
+	</g>
+</svg>

@@ -126,6 +126,30 @@ for name, amp in [('large', 1.0), ('small', 0.1)]:
 # 1 ステップの図と空間・時間の図用
 traj1 = diffuse(hot(0.3, 0.12, 1.0), 20)
 
+# POD と DMD の対比：traj1 の 21 枚のスナップショットだけを使う
+# POD：スナップショットを並べた行列の左特異ベクトル（時間平均は引かない）。時間係数 a_j(n) = φ_jᵀ uⁿ
+# DMD：同じ軌跡の連続する 2 時刻の組 20 組から W = Y X⁺。時間係数 c_j λ_jⁿ（u⁰ = Σ c_j v_j）
+Uq, Sq, _ = np.linalg.svd(traj1, full_matrices=False)
+sines = np.array([np.sin(kk * np.pi * x) for kk in range(1, N + 1)])
+sines /= np.linalg.norm(sines, axis=1, keepdims=True)
+pod = {'modes': [], 'coef': [], 'sine': [], 'energy': [round(float(s), 5) for s in (Sq ** 2 / np.sum(Sq ** 2))[:3]]}
+for j in range(3):
+    phi = Uq[:, j] * np.sign(Uq[:, j] @ traj1[:, 0])  # 時間係数が n = 0 で正になる向き
+    pod['modes'].append(R6(phi / np.abs(phi).max()))
+    pod['coef'].append(R6(phi @ traj1))
+    pod['sine'].append([round(float(t), 4) for t in (sines @ phi) ** 2])
+Wt = traj1[:, 1:] @ np.linalg.pinv(traj1[:, :-1])
+lt, Vt_ = np.linalg.eig(Wt)
+lt = np.real(lt); Vt_ = np.real(Vt_)
+o = np.argsort(-lt); lt = lt[o]; Vt_ = Vt_[:, o]
+bt = np.linalg.solve(Vt_, traj1[:, 0])
+dmdc = {'lam': [round(float(l), 6) for l in lt[:3]], 'modes': [], 'coef': [], 'W_maxdiff_A': float(np.abs(Wt - A).max())}
+for j in range(3):
+    v = Vt_[:, j] * np.sign(bt[j]); s = np.abs(v).max()  # 時間係数が n = 0 で正になる向き
+    dmdc['modes'].append(R6(v / s))
+    dmdc['coef'].append(R6(abs(bt[j]) * s * lt[j] ** np.arange(21)))
+podDmd = {'pod': pod, 'dmd': dmdc}
+
 out = {
     'x': R6(x), 'A_lam': R6(lam_A), 'cont_lam': R6(lam_cont),
     'ics': [[round(float(t), 5) for t in ic] for ic in ics],
@@ -134,10 +158,13 @@ out = {
     'grid': grid, 'roll': roll_out, 'burgers': bur,
     'traj1': [R6(traj1[:, n]) for n in range(21)],
     'X': [R6(row) for row in X],
+    'podDmd': podDmd,
 }
 here = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(here, 'data.json'), 'w') as f:
     json.dump(out, f, separators=(',', ':'))
 print('ok', len(grid), 'grid entries; W16-A max', out['W16_maxdiff_A'], 'burgers', {k: v['relerr'] for k, v in bur['cases'].items()}, 'train resid', bur['train_resid'])
 print('sv', np.round(sv_full, 5))
+print('pod energy', pod['energy'], 'sine', [p[:3] for p in pod['sine']], 'dmd lam', dmdc['lam'], 'W-A', dmdc['W_maxdiff_A'])
+print('pod coef', [[round(c, 3) for c in cc[::2]] for cc in pod['coef']])
 for r in (16, 6): print(r, [round(roll_out['ranks'][str(r)]['err'][n], 5) for n in (1, 10, 30, 60)])

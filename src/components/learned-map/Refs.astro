@@ -7,8 +7,10 @@ interface Props {
 	uses?: string;
 	lang?: 'ja' | 'en';
 	page?: string;
+	// 資料ごとの一言。キーは参考文献のキー
+	notes?: Record<string, string>;
 }
-const { uses = '{}', lang = 'ja', page } = Astro.props;
+const { uses = '{}', lang = 'ja', page, notes = {} } = Astro.props;
 const figureCites = figureCitesFor(page);
 const counts: Record<string, number> = JSON.parse(uses);
 const figLabel = (id: string) => (lang === 'ja' ? `図 ${id.replace('fig-', '')}` : `Fig. ${id.replace('fig-', '')}`);
@@ -47,6 +49,7 @@ const bodyLabel = lang === 'ja' ? '本文' : 'Text';
 								))}
 							</span>
 						)}
+						{notes[r.key] && <span class="note">{notes[r.key]}</span>}
 					</span>
 				</li>
 			);
@@ -82,6 +85,10 @@ const bodyLabel = lang === 'ja' ? '本文' : 'Text';
 		margin-left: 0.75em;
 		font-size: 0.8125rem;
 		white-space: nowrap;
+	}
+	.note {
+		display: block;
+		color: #3d4a5a;
 	}
 	.back a {
 		margin-left: 0.4em;

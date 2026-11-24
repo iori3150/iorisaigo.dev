@@ -1,5 +1,5 @@
 ---
-// 図 1：解法のスナップショットから行列 W を推定し、W で時間を進める
+// 図 8（まとめ）：解法のスナップショットから行列 W を推定し、W で時間を進める
 import { data, cells, sequential, diverging, pts, COLORS } from './fig';
 
 const traj = data.traj1; // 21 時刻 × 16 点
@@ -26,6 +26,8 @@ const pred = data.roll.ranks['16'].pred[n];
 	</g>
 	<g font-size="10" fill={COLORS.muted}>
 		<text x="40" y="119" text-anchor="end">x</text>
+		<text x="40" y="49" text-anchor="end">0</text>
+		<text x="40" y="192" text-anchor="end">1</text>
 		<text x="44" y="206">0</text>
 		<text x="254" y="206" text-anchor="end">20</text>
 		<text x="149" y="206" text-anchor="middle">時刻のステップ n</text>

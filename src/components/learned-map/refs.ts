@@ -72,7 +72,7 @@ const sortedAll = byYear([...refs, ...dmdRefs]);
 
 // ページごとの参考文献（番号はそのページの中で年の古い順に振り直す）。載っていないページ（IV-0）は全件
 export const pageRefs: Record<string, string[]> = {
-	'learned/01-dmd': ['sirovich1987', 'koopman1931', 'mezic2005', 'rowley2009', 'schmid2010', 'tu2014', 'sanchez2020', 'brunton2016', 'taira2017'],
+	'learned/01-dmd': ['rowley2009', 'schmid2010', 'tu2014', 'sanchez2020', 'brunton2016', 'taira2017'],
 	'learned/07-taxonomy': ['tompson2017', 'raissi2019', 'sanchez2020', 'pfaff2021', 'li2021fno', 'lu2021', 'brandstetter2022', 'wu2024'],
 };
 export const listFor = (page?: string): Ref[] => {
