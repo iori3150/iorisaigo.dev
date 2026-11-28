@@ -1,0 +1,184 @@
+---
+// 図 4：W の固有値と固有ベクトル。使う組の数 m と打ち切りランク r を変えて、取れる固有値とモードを見る
+import { ui, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+}
+const { lang = 'ja' } = Astro.props;
+const t = ui[lang];
+---
+
+<div class="dmd-spec" data-t={JSON.stringify(t)}>
+	<div class="grid">
+		<svg data-plane viewBox="0 0 300 300" role="img" aria-label="固有値を複素平面に置いた図"></svg>
+		<svg data-line viewBox="0 0 300 300" role="img" aria-label="固有値をモード番号の順に並べた図"></svg>
+		<svg data-sv viewBox="0 0 300 190" role="img" aria-label="X の特異値と、残すランク"></svg>
+		<svg data-modes viewBox="0 0 300 190" role="img" aria-label="DMD のモードと正弦波"></svg>
+	</div>
+	<div class="lm-controls">
+		<label>{t.pairs}<input type="range" min="2" max="36" step="2" value="36" data-m /><output data-m-out></output></label>
+		<label>{t.rank}<input type="range" min="1" max="16" step="1" value="16" data-r /><output data-r-out></output></label>
+	</div>
+	<div class="lm-readout" data-readout aria-live="polite"></div>
+</div>
+
+<style>
+	.grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem 1.25rem;
+	}
+	@media (max-width: 40rem) {
+		.grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
+
+<script>
+	import data from './data.json';
+	import { el, text, clear, fmt, pow10 } from '../learned-taxonomy/draw';
+
+	const C = { text: '#15233d', muted: '#5c6b7c', faint: '#8c99a6', rule: '#d9e0e6', grid: '#ebeff2', dmd: '#2350d8', solver: '#c4581c', exact: '#16866a' };
+	type Entry = { m: number; r: number; lam: number[][]; modes: number[][] };
+	const grid = new Map<string, Entry>((data.grid as Entry[]).map((e) => [`${e.m}-${e.r}`, e]));
+	const x = data.x as number[];
+	const lamA = data.A_lam as number[];
+	const lamC = data.cont_lam as number[];
+	const svByM = data.svByM as Record<string, number[]>;
+
+	// 絶対値が最大の成分を +1 にそろえる（gen-data.py のモードと同じ）
+	const norm = (v: number[]) => {
+		let j = 0;
+		v.forEach((a, i) => {
+			if (Math.abs(a) > Math.abs(v[j])) j = i;
+		});
+		return v.map((a) => a / v[j]);
+	};
+
+	for (const root of document.querySelectorAll<HTMLElement>('.dmd-spec')) {
+		const t = JSON.parse(root.dataset.t!);
+		const plane = root.querySelector('svg[data-plane]')!;
+		const line = root.querySelector('svg[data-line]')!;
+		const svSvg = root.querySelector('svg[data-sv]')!;
+		const modesSvg = root.querySelector('svg[data-modes]')!;
+		const mSlider = root.querySelector<HTMLInputElement>('[data-m]')!;
+		const rSlider = root.querySelector<HTMLInputElement>('[data-r]')!;
+		const mOut = root.querySelector('[data-m-out]')!;
+		const rOut = root.querySelector('[data-r-out]')!;
+		const readout = root.querySelector('[data-readout]')!;
+
+		function drawPlane(e: Entry) {
+			clear(plane);
+			const cx = 150, cy = 150, s = 125;
+			const px = (re: number) => cx + s * re;
+			const py = (im: number) => cy - s * im;
+			el('line', { x1: 10, x2: 290, y1: cy, y2: cy, stroke: C.rule }, plane);
+			el('line', { x1: cx, x2: cx, y1: 10, y2: 290, stroke: C.rule }, plane);
+			el('circle', { cx, cy, r: s, fill: 'none', stroke: C.faint, 'stroke-dasharray': '4 3' }, plane);
+			text(plane, 290, cy + 30, t.re, { anchor: 'end', size: 10 });
+			text(plane, cx + 4, 20, t.im, { size: 10 });
+			text(plane, px(1), cy + 14, '1', { anchor: 'middle', size: 10 });
+			text(plane, px(-1), cy + 14, '−1', { anchor: 'middle', size: 10 });
+			for (const l of lamA) el('circle', { cx: px(l), cy: py(0), r: 6, fill: 'none', stroke: C.faint, 'stroke-width': 1.5 }, plane);
+			for (const [re, im] of e.lam) el('circle', { cx: px(re), cy: py(im), r: 3.5, fill: C.dmd }, plane);
+			text(plane, 12, 296, `${t.eigDmd}（●）、${t.eigA}（○）`, { size: 10 });
+		}
+
+		function drawLine(e: Entry) {
+			clear(line);
+			const x0 = 36, x1 = 290, y0 = 44, y1 = 258;
+			const sx = (k: number) => x0 + ((x1 - x0) * (k - 1)) / 15;
+			const sy = (v: number) => y1 - ((y1 - y0) * (v + 0.8)) / 1.85;
+			for (const v of [-0.5, 0, 0.5, 1]) {
+				el('line', { x1: x0, x2: x1, y1: sy(v), y2: sy(v), stroke: v === 0 ? C.rule : C.grid }, line);
+				text(line, x0 - 5, sy(v) + 4, String(v).replace('-', '−'), { anchor: 'end', size: 10 });
+			}
+			for (const k of [1, 4, 8, 12, 16]) text(line, sx(k), y1 + 14, String(k), { anchor: 'middle', size: 10 });
+			text(line, x1, y1 + 28, t.index, { anchor: 'end', size: 10 });
+			el('polyline', { points: lamC.map((v, i) => `${sx(i + 1)},${sy(v)}`).join(' '), fill: 'none', stroke: C.exact, 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, line);
+			lamA.forEach((v, i) => el('circle', { cx: sx(i + 1), cy: sy(v), r: 6, fill: 'none', stroke: C.faint, 'stroke-width': 1.5 }, line));
+			const sorted = e.lam.map((l) => l[0]).sort((a, b) => b - a);
+			sorted.forEach((v, i) => el('circle', { cx: sx(i + 1), cy: sy(v), r: 3.5, fill: C.dmd }, line));
+			text(line, x0, 12, `${t.eigDmd}（●）、${t.eigA}（○）`, { size: 10 });
+			text(line, x0, 24, `${t.eigCont}（緑の破線）`, { size: 10, fill: C.exact });
+			return sorted;
+		}
+
+		function drawSv(e: Entry) {
+			clear(svSvg);
+			const sv = svByM[String(e.m)].slice(0, 16);
+			const x0 = 36, x1 = 290, y0 = 24, y1 = 150;
+			const lo = -3, hi = 1;
+			const sy = (v: number) => y1 - ((Math.log10(Math.max(v, 10 ** lo)) - lo) / (hi - lo)) * (y1 - y0);
+			for (let p = lo; p <= hi; p++) {
+				el('line', { x1: x0, x2: x1, y1: sy(10 ** p), y2: sy(10 ** p), stroke: C.grid }, svSvg);
+				text(svSvg, x0 - 5, sy(10 ** p) + 4, pow10(p), { anchor: 'end', size: 10 });
+			}
+			const bw = (x1 - x0) / 16;
+			sv.forEach((v, i) => {
+				const kept = i < e.r;
+				el('rect', { x: x0 + i * bw + 2, y: sy(v), width: bw - 4, height: y1 - sy(v), fill: kept ? C.dmd : C.rule }, svSvg);
+				if (i === 0 || (i + 1) % 4 === 0) text(svSvg, x0 + (i + 0.5) * bw, y1 + 14, String(i + 1), { anchor: 'middle', size: 10 });
+			});
+			text(svSvg, x0, 12, `${t.sv}（${t.kept}：青、${t.dropped}：灰）`, { size: 10 });
+		}
+
+		function drawModes(e: Entry) {
+			clear(modesSvg);
+			const w = 92;
+			for (let j = 0; j < 3; j++) {
+				const x0 = 8 + j * (w + 5), x1 = x0 + w, y0 = 44, y1 = 156;
+				const sx = (v: number) => x0 + (x1 - x0) * v;
+				const sy = (v: number) => (y0 + y1) / 2 - ((y1 - y0) / 2) * v * 0.95;
+				el('line', { x1: x0, x2: x1, y1: sy(0), y2: sy(0), stroke: C.rule }, modesSvg);
+				if (j >= e.modes.length) {
+					text(modesSvg, (x0 + x1) / 2, sy(0) - 6, '—', { anchor: 'middle', size: 12 });
+					continue;
+				}
+				const re = e.lam[j][0];
+				let k = 0;
+				lamA.forEach((v, i) => {
+					if (Math.abs(v - re) < Math.abs(lamA[k] - re)) k = i;
+				});
+				const sine = norm(x.map((xi) => Math.sin((k + 1) * Math.PI * xi)));
+				el('polyline', { points: x.map((xi, i) => `${sx(xi)},${sy(sine[i])}`).join(' '), fill: 'none', stroke: C.solver, 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }, modesSvg);
+				el('polyline', { points: x.map((xi, i) => `${sx(xi)},${sy(e.modes[j][i])}`).join(' '), fill: 'none', stroke: C.dmd, 'stroke-width': 2 }, modesSvg);
+				text(modesSvg, (x0 + x1) / 2, 32, `λ = ${re.toFixed(3)}`, { anchor: 'middle', size: 10 });
+				text(modesSvg, (x0 + x1) / 2, y1 + 16, `sin(${k + 1}πx)`, { anchor: 'middle', size: 10, fill: C.solver });
+			}
+			text(modesSvg, 8, 12, `${t.mode}（青）と正弦波（橙の破線）`, { size: 10 });
+		}
+
+		function render() {
+			const m = +mSlider.value;
+			const rMax = Math.min(m, 16);
+			rSlider.max = String(rMax);
+			if (+rSlider.value > rMax) rSlider.value = String(rMax);
+			const r = +rSlider.value;
+			const e = grid.get(`${m}-${r}`)!;
+			mOut.textContent = String(m);
+			rOut.textContent = String(r);
+			drawPlane(e);
+			const sorted = drawLine(e);
+			drawSv(e);
+			drawModes(e);
+			const errs = [0, 1, 2].filter((i) => i < sorted.length).map((i) => Math.abs(sorted[i] - lamA[i]));
+			readout.replaceChildren();
+			const add = (label: string, v: string) => {
+				const s = document.createElement('span');
+				s.append(label + ' ');
+				const b = document.createElement('b');
+				b.textContent = v;
+				s.append(b);
+				readout.append(s);
+			};
+			add('求まった（0 でない）固有値', `${e.lam.length} 個`);
+			add('実部の大きい 3 つの固有値の誤差（最大）', fmt(Math.max(...errs)));
+		}
+		mSlider.addEventListener('input', render);
+		rSlider.addEventListener('input', render);
+		render();
+	}
+</script>

@@ -1,14 +1,16 @@
 ---
-// 引用の印。[番号 節] を参考文献の項目へのリンクにする。i は plugins/remark-cite-index.mjs が振る出現番号で、参考文献からここへ戻るのに使う
+// 引用の印。[番号 節] を参考文献の項目へのリンクにする。i は plugins/remark-cite-index.mjs が振る出現番号で、参考文献からここへ戻るのに使う。
+// page も同じプラグインが MDX のパスから入れ、番号をページごとに振る
 import { numberOf } from './refs';
 
 interface Props {
 	k: string;
 	at?: string;
 	i?: string | number;
+	page?: string;
 }
-const { k, at, i } = Astro.props;
-const n = numberOf(k);
+const { k, at, i, page } = Astro.props;
+const n = numberOf(k, page);
 ---
 
 <a class="lm-cite" id={i === undefined ? undefined : `cite-${k}-${i}`} href={`#ref-${k}`}>[{n}{at ? ` ${at}` : ''}]</a>

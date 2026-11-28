@@ -9,8 +9,16 @@ function walk(node, fn) {
 	for (const c of node.children ?? []) walk(c, fn);
 }
 
+// ページの識別子（docs/ja/ の下のパス、拡張子なし）。参考文献の番号をページごとに振るのに使う
+function pageOf(file) {
+	const m = String(file?.path ?? '').replace(/\\/g, '/').match(/\/docs\/(?:ja|en)\/(.+)\.mdx?$/);
+	return m ? m[1] : undefined;
+}
+
 export default function remarkCiteIndex() {
-	return (tree) => {
+	return (tree, file) => {
+		const page = pageOf(file);
+		const pageAttr = page ? [{ type: 'mdxJsxAttribute', name: 'page', value: page }] : [];
 		const counts = {};
 		const refsNodes = [];
 		walk(tree, (node) => {
@@ -19,13 +27,13 @@ export default function remarkCiteIndex() {
 				const k = attr(node, 'k')?.value;
 				if (typeof k !== 'string') throw new Error('<Cite> の k は文字列で書く');
 				counts[k] = (counts[k] ?? 0) + 1;
-				node.attributes.push({ type: 'mdxJsxAttribute', name: 'i', value: String(counts[k]) });
+				node.attributes.push({ type: 'mdxJsxAttribute', name: 'i', value: String(counts[k]) }, ...pageAttr);
 			} else if (node.name === 'Refs') {
 				refsNodes.push(node);
 			}
 		});
 		for (const n of refsNodes) {
-			n.attributes.push({ type: 'mdxJsxAttribute', name: 'uses', value: JSON.stringify(counts) });
+			n.attributes.push({ type: 'mdxJsxAttribute', name: 'uses', value: JSON.stringify(counts) }, ...pageAttr);
 		}
 	};
 }

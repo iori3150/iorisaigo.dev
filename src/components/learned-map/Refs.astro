@@ -1,13 +1,17 @@
 ---
 // 参考文献の一覧。各項目から、本文の引用の箇所と、図の中で引用した図へ戻れる
-import { sorted, numberOf } from './refs';
-import { figureCites } from './figure-cites';
+import { listFor, numberOf } from './refs';
+import { figureCitesFor } from './figure-cites';
 
 interface Props {
 	uses?: string;
 	lang?: 'ja' | 'en';
+	page?: string;
+	// 資料ごとの一言。キーは参考文献のキー
+	notes?: Record<string, string>;
 }
-const { uses = '{}', lang = 'ja' } = Astro.props;
+const { uses = '{}', lang = 'ja', page, notes = {} } = Astro.props;
+const figureCites = figureCitesFor(page);
 const counts: Record<string, number> = JSON.parse(uses);
 const figLabel = (id: string) => (lang === 'ja' ? `図 ${id.replace('fig-', '')}` : `Fig. ${id.replace('fig-', '')}`);
 const bodyLabel = lang === 'ja' ? '本文' : 'Text';
@@ -15,13 +19,13 @@ const bodyLabel = lang === 'ja' ? '本文' : 'Text';
 
 <ol class="lm-refs not-content">
 	{
-		sorted.map((r) => {
+		listFor(page).map((r) => {
 			const figs = Object.entries(figureCites)
 				.filter(([, keys]) => keys.includes(r.key))
 				.map(([id]) => id);
 			return (
 				<li id={`ref-${r.key}`}>
-					<span class="n">[{numberOf(r.key)}]</span>
+					<span class="n">[{numberOf(r.key, page)}]</span>
 					<span class="body">
 						{r.authors} ({r.year}). {r.title}. <i>{r.venue}</i>.
 						{r.url && (
@@ -45,6 +49,7 @@ const bodyLabel = lang === 'ja' ? '本文' : 'Text';
 								))}
 							</span>
 						)}
+						{notes[r.key] && <span class="note">{notes[r.key]}</span>}
 					</span>
 				</li>
 			);
@@ -80,6 +85,10 @@ const bodyLabel = lang === 'ja' ? '本文' : 'Text';
 		margin-left: 0.75em;
 		font-size: 0.8125rem;
 		white-space: nowrap;
+	}
+	.note {
+		display: block;
+		color: #3d4a5a;
 	}
 	.back a {
 		margin-left: 0.4em;

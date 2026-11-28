@@ -1,0 +1,71 @@
+---
+// 図 6：主な手法を 4 つの軸で並べた表。マスごとに原論文の節を引用の印で付ける
+import { numberOf } from '../learned-map/refs';
+import { columns, rows } from './table-data';
+
+interface Props {
+	lang?: 'ja';
+	page: string;
+}
+const { lang = 'ja', page } = Astro.props;
+---
+
+<div class="lm-scroll">
+	<table class="lt-table">
+		<colgroup><col style="width: 17%" /><col /><col /><col /><col /></colgroup>
+		<thead>
+			<tr>{columns[lang].map((h) => <th scope="col">{h}</th>)}</tr>
+		</thead>
+		<tbody>
+			{
+				rows[lang].map((row) => (
+					<tr>
+						<th scope="row">{row.name}</th>
+						{row.cells.map((cell) => (
+							<td>
+								{cell.text}
+								{cell.cites.map((c) => (
+									<a class="lm-cite" href={`#ref-${c.k}`}>[{numberOf(c.k, page)} {c.at}]</a>
+								))}
+							</td>
+						))}
+					</tr>
+				))
+			}
+		</tbody>
+	</table>
+</div>
+
+<style>
+	.lt-table {
+		border-collapse: collapse;
+		font-size: 0.8125rem;
+		line-height: 1.6;
+		width: 100%;
+		table-layout: fixed;
+		display: table;
+		margin: 0;
+	}
+	@media (max-width: 50rem) {
+		.lt-table {
+			min-width: 640px;
+		}
+	}
+	.lt-table th,
+	.lt-table td {
+		border: 1px solid #d9e0e6;
+		padding: 0.35rem 0.4rem;
+		vertical-align: top;
+		text-align: left;
+	}
+	.lt-table thead th {
+		background: #ebeff2;
+		color: #15233d;
+		font-weight: 600;
+	}
+	.lt-table tbody th {
+		overflow-wrap: anywhere;
+		color: #15233d;
+		font-weight: 600;
+	}
+</style>

@@ -1,0 +1,48 @@
+---
+// 図 7：小振幅（0.1）の Burgers 方程式のデータから推定した W で、振幅 1 と 0.1 の初期分布を進める
+import { data, pts, sci, COLORS } from './fig';
+
+const cases = [
+	{ key: 'large', title: '初期分布の高さ 1', c: data.burgers.cases.large },
+	{ key: 'small', title: '初期分布の高さ 0.1（表示は高さで割った値）', c: data.burgers.cases.small },
+];
+const w = 330, h = 190, y0 = 34;
+const sx = (x0: number) => (x: number) => x0 + w * x;
+const sy = (v: number) => y0 + h - (h * v) / 1.1;
+---
+
+<svg viewBox="0 0 720 290" role="img" aria-label="小振幅のデータから推定した W は、振幅 0.1 では Burgers 方程式の解に近いが、振幅 1 では合わない">
+	{
+		cases.map((k, idx) => {
+			const x0 = 20 + idx * 360;
+			const s = sx(x0);
+			const n = '40';
+			return (
+				<g>
+					<text x={x0} y="20" font-size="12" font-weight="600" fill={COLORS.text}>{k.title}</text>
+					<line x1={x0} x2={x0 + w} y1={sy(0)} y2={sy(0)} stroke={COLORS.rule} />
+					<line x1={x0} x2={x0} y1={y0} y2={y0 + h} stroke={COLORS.rule} />
+					<text x={x0 - 4} y={sy(0) + 4} font-size="10" fill={COLORS.muted} text-anchor="end">0</text>
+					<text x={x0 - 4} y={sy(1) + 4} font-size="10" fill={COLORS.muted} text-anchor="end">1</text>
+					<polyline points={pts(data.x, k.c.ref['0'], s, sy)} fill="none" stroke={COLORS.faint} stroke-width="1.5" />
+					<polyline points={pts(data.x, k.c.ref[n], s, sy)} fill="none" stroke={COLORS.solver} stroke-width="2" />
+					<polyline points={pts(data.x, k.c.pred[n], s, sy)} fill="none" stroke={COLORS.dmd} stroke-width="2" stroke-dasharray="5 3" />
+					<text x={x0} y={y0 + h + 16} font-size="10" fill={COLORS.muted}>0</text>
+					<text x={x0 + w} y={y0 + h + 16} font-size="10" fill={COLORS.muted} text-anchor="end">1</text>
+					<text x={x0 + w / 2} y={y0 + h + 16} font-size="10" fill={COLORS.muted} text-anchor="middle">x</text>
+					<text x={x0} y={y0 + h + 38} font-size="12" fill={COLORS.text}>
+						n = 40 の相対誤差 {(k.c.relerr[n] * 100).toFixed(k.c.relerr[n] < 0.1 ? 1 : 0)}%
+					</text>
+				</g>
+			);
+		})
+	}
+	<g font-size="11" fill={COLORS.text}>
+		<line x1="20" x2="40" y1="278" y2="278" stroke={COLORS.faint} stroke-width="1.5" />
+		<text x="46" y="282">n = 0</text>
+		<line x1="110" x2="130" y1="278" y2="278" stroke={COLORS.solver} stroke-width="2" />
+		<text x="136" y="282">n = 40、解法</text>
+		<line x1="250" x2="270" y1="278" y2="278" stroke={COLORS.dmd} stroke-width="2" stroke-dasharray="5 3" />
+		<text x="276" y="282">n = 40、W を 40 回掛けた値</text>
+	</g>
+</svg>

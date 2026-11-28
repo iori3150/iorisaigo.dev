@@ -1,0 +1,44 @@
+---
+// 図 3：組を並べた行列 X, Y から W = Y X⁺ を求め、A と比べる
+import { data, A, N, matVec, cells, sequential, diverging, sci, COLORS } from './fig';
+
+const X: number[][] = data.X; // 16 × 36
+const m = X[0].length;
+const cols = Array.from({ length: m }, (_, j) => X.map((row) => row[j]));
+const Y = Array.from({ length: N }, (_, i) => cols.map((c) => matVec(A, c)[i]));
+const cw = 8.8, ch = 9;
+const xCells = cells(X, 30, 34, cw, ch, (v) => sequential(v, 1));
+const yCells = cells(Y, 372, 34, cw, ch, (v) => sequential(v, 1));
+const wCells = cells(data.W16, 30, 246, 9.5, 9.5, (v) => diverging(v, 0.4));
+const aCells = cells(A, 236, 246, 9.5, 9.5, (v) => diverging(v, 0.4));
+const seps = [1, 2, 3, 4, 5].map((k) => k * 6);
+---
+
+<svg viewBox="0 0 720 428" role="img" aria-label="スナップショットの組を並べた行列 X, Y から、最小二乗で行列 W を求め、陽解法の行列 A と比べる">
+	<g font-size="12" font-weight="600" fill={COLORS.text}>
+		<text x="30" y="22">X：uⁿ を 36 列並べる</text>
+		<text x="372" y="22">Y：それぞれの次の uⁿ⁺¹</text>
+		<text x="30" y="234">W = Y X⁺</text>
+		<text x="236" y="234">A（陽解法の行列）</text>
+	</g>
+	<g>
+		{xCells.map((c) => <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={c.fill} />)}
+		{yCells.map((c) => <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={c.fill} />)}
+		<rect x="30" y="34" width={m * cw} height={N * ch} fill="none" stroke={COLORS.rule} />
+		<rect x="372" y="34" width={m * cw} height={N * ch} fill="none" stroke={COLORS.rule} />
+		{seps.map((k) => <line x1={30 + k * cw} x2={30 + k * cw} y1="34" y2={34 + N * ch} stroke={COLORS.solver} stroke-width="1" />)}
+		{seps.map((k) => <line x1={372 + k * cw} x2={372 + k * cw} y1="34" y2={34 + N * ch} stroke={COLORS.solver} stroke-width="1" />)}
+	</g>
+	<g font-size="10" fill={COLORS.muted}>
+	</g>
+	<g>
+		{wCells.map((c) => <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={c.fill} />)}
+		{aCells.map((c) => <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={c.fill} />)}
+		<rect x="30" y="246" width={N * 9.5} height={N * 9.5} fill="none" stroke={COLORS.rule} />
+		<rect x="236" y="246" width={N * 9.5} height={N * 9.5} fill="none" stroke={COLORS.rule} />
+	</g>
+	<g font-size="12" fill={COLORS.text}>
+		<text x="440" y="296" font-weight="600">最大の差 max |W − A|</text>
+		<text x="440" y="320" font-size="18" font-weight="600" fill={COLORS.dmd}>{sci(data.W16_maxdiff_A)}</text>
+	</g>
+</svg>

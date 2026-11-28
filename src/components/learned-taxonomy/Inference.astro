@@ -1,0 +1,108 @@
+---
+// 図 5：予測をつないで進める（ロールアウト）か、1 回の評価で出すかで、誤差の伸び方を比べる。
+// Δt を安定条件 r ≤ 1/2 より大きくすると、陽解法も発散する
+import { ui, type Lang } from './strings';
+
+interface Props {
+	lang?: Lang;
+}
+const { lang = 'ja' } = Astro.props;
+const t = ui[lang];
+const STEPS = 60;
+---
+
+<div class="lt-inf" data-t={JSON.stringify(t)}>
+	<div class="lm-legend">
+		<span style="--c: #c4581c" class="dash">{t.explicit}</span>
+		<span style="--c: #2350d8">{t.rollout}</span>
+		<span style="--c: #16866a">{t.oneShot}</span>
+		<span style="--c: #15233d" class="dot">{t.reference}</span>
+	</div>
+	<div class="lm-scroll"><svg viewBox="0 0 720 250" role="img" aria-label={`${t.rollout} / ${t.oneShot}`} style="min-width: 560px"></svg></div>
+	<div class="lm-controls">
+		<label>Δt（r = αΔt/Δx²）<input type="range" min="0.1" max="1" step="0.05" value="0.4" data-r /><output data-r-out></output></label>
+		<label>{t.steps} n<input type="range" min="1" max={STEPS} step="1" value={STEPS} data-n /><output data-n-out></output></label>
+	</div>
+	<div class="lm-readout">
+		<span>{t.growth}：{t.explicit} <b data-ga></b></span>
+		<span>{t.rollout} <b data-gw></b></span>
+		<span>{t.evals}：{t.rollout} <b data-ev></b>{t.times}　{t.oneShot} <b>1</b>{t.times}</span>
+	</div>
+</div>
+
+<script>
+	import * as C from './calc';
+	import { el, text, clear, fmt, profileFrame, logFrame, polyline, COLORS } from './draw';
+
+	const STEPS = 60;
+
+	for (const root of document.querySelectorAll<HTMLElement>('.lt-inf')) {
+		const t = JSON.parse(root.dataset.t!);
+		const svg = root.querySelector('svg')!;
+		const rIn = root.querySelector<HTMLInputElement>('[data-r]')!;
+		const nIn = root.querySelector<HTMLInputElement>('[data-n]')!;
+		const rOut = root.querySelector('[data-r-out]')!;
+		const nOut = root.querySelector('[data-n-out]')!;
+		const gaOut = root.querySelector('[data-ga]')!;
+		const gwOut = root.querySelector('[data-gw]')!;
+		const evOut = root.querySelector('[data-ev]')!;
+
+		const gL = el('g', {}, svg), gR = el('g', {}, svg);
+		const fL = logFrame(gL, { x0: 50, x1: 330, y0: 30, y1: 200 }, -8, 2, STEPS, [0, 20, 40, 60], `${t.step} n`, t.errorRms);
+		const titleR = text(gR, 420, 18, '', { fill: COLORS.text, size: 12, weight: 600 });
+		const fR = profileFrame(gR, { x0: 420, x1: 680, y0: 34, y1: 194 }, -0.2, 1, [0, 0.5, 1]);
+		const dynL = el('g', {}, gL), dynR = el('g', {}, gR);
+
+		// Δt を変えたときだけ計算し直す
+		let cache: { r: number; ref: number[][]; exp: number[][]; roll: number[][]; op: number[][]; ga: number; gw: number } | null = null;
+		const compute = (r: number) => {
+			if (cache && cache.r === r) return cache;
+			const ref = C.reference(r, C.TEST_U0, STEPS);
+			const A = C.explicitA(r);
+			const W = C.fitStep({ r });
+			const G = C.fitOperators(r, STEPS);
+			cache = {
+				r,
+				ref,
+				exp: C.rollout(A, C.TEST_U0, STEPS),
+				roll: C.rollout(W, C.TEST_U0, STEPS),
+				op: G.map((g) => C.mv(g, C.TEST_U0)),
+				ga: C.growth(A),
+				gw: C.growth(W),
+			};
+			return cache;
+		};
+
+		const draw = () => {
+			const r = +rIn.value, n = +nIn.value;
+			rOut.textContent = r.toFixed(2);
+			nOut.textContent = String(n);
+			const d = compute(r);
+			const series: [number[][], string, string?][] = [
+				[d.exp, COLORS.solver, '5 4'],
+				[d.roll, COLORS.learned],
+				[d.op, COLORS.other],
+			];
+			clear(dynL);
+			// 安定条件の境目より大きい r を示す帯
+			for (const [u, color, dash] of series) {
+				const e = u.map((v, k) => C.rmsDiff(v, d.ref[k]));
+				el('polyline', { fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-dasharray': dash ?? 'none', points: polyline(e.slice(1, n + 1).map((v, k) => [fL.sx(k + 1), fL.sy(v)])) }, dynL);
+			}
+			el('line', { x1: fL.sx(n), x2: fL.sx(n), y1: 30, y2: 200, stroke: COLORS.faint, 'stroke-dasharray': '3 3' }, dynL);
+			clear(dynR);
+			titleR.textContent = `n = ${n}`;
+			const clip = (v: number) => Math.max(-0.2, Math.min(1, v));
+			for (const [u, color, dash] of series)
+				el('polyline', { fill: 'none', stroke: color, 'stroke-width': 1.8, 'stroke-dasharray': dash ?? 'none', points: polyline([0, ...C.XS, 1].map((x, i) => [fR.sx(x), fR.sy(clip([0, ...u[n], 0][i]))])) }, dynR);
+			C.XS.forEach((x, j) => el('circle', { cx: fR.sx(x), cy: fR.sy(d.ref[n][j]), r: 2.6, fill: COLORS.text }, dynR));
+			const lab = (g: number) => `${g.toFixed(3)}（${g > 1 + 1e-9 ? t.unstable : t.stable}）`;
+			gaOut.textContent = lab(d.ga);
+			gwOut.textContent = lab(d.gw);
+			evOut.textContent = String(n);
+		};
+		rIn.addEventListener('input', draw);
+		nIn.addEventListener('input', draw);
+		draw();
+	}
+</script>

@@ -1,0 +1,63 @@
+---
+// 図 8（まとめ）：解法のスナップショットから行列 W を推定し、W で時間を進める
+import { data, cells, sequential, diverging, pts, COLORS } from './fig';
+
+const traj = data.traj1; // 21 時刻 × 16 点
+const snap = Array.from({ length: 16 }, (_, i) => traj.map((col) => col[i]));
+const snapCells = cells(snap, 44, 40, 10, 9.5, (v) => sequential(v, 1));
+const wCells = cells(data.W16, 306, 40, 9.5, 9.5, (v) => diverging(v, 0.4));
+const px0 = 500, px1 = 690, py0 = 40, py1 = 192;
+const sx = (x: number) => px0 + (px1 - px0) * x;
+const sy = (u: number) => py1 - (py1 - py0) * u;
+const n = 30;
+const ref = data.roll.ref[n];
+const pred = data.roll.ranks['16'].pred[n];
+---
+
+<svg viewBox="0 0 720 236" role="img" aria-label="解法のスナップショットから行列 W を求め、W を掛けて時間を進める流れ">
+	<g font-size="12" fill={COLORS.text}>
+		<text x="44" y="22" font-weight="600">① スナップショット</text>
+		<text x="306" y="22" font-weight="600">② 行列 W</text>
+		<text x="500" y="22" font-weight="600">③ W で進めた予測</text>
+	</g>
+	<g>
+		{snapCells.map((c) => <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={c.fill} />)}
+		<rect x="44" y="40" width="210" height="152" fill="none" stroke={COLORS.rule} />
+	</g>
+	<g font-size="10" fill={COLORS.muted}>
+		<text x="40" y="119" text-anchor="end">x</text>
+		<text x="40" y="49" text-anchor="end">0</text>
+		<text x="40" y="192" text-anchor="end">1</text>
+		<text x="44" y="206">0</text>
+		<text x="254" y="206" text-anchor="end">20</text>
+		<text x="149" y="206" text-anchor="middle">時刻のステップ n</text>
+		<text x="306" y="206">行 i、列 j</text>
+	</g>
+	<g>
+		{wCells.map((c) => <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={c.fill} />)}
+		<rect x="306" y="40" width="152" height="152" fill="none" stroke={COLORS.rule} />
+	</g>
+	<g stroke={COLORS.text} stroke-width="1.5" fill="none">
+		<path d="M262 116 H296 M290 111 L296 116 L290 121" />
+		<path d="M466 116 H492 M486 111 L492 116 L486 121" />
+	</g>
+	<g font-size="10" fill={COLORS.muted} text-anchor="middle">
+		<text x="279" y="108">最小二乗</text>
+		<text x="479" y="108">n 回</text>
+	</g>
+	<g>
+		<line x1={px0} x2={px1} y1={sy(0)} y2={sy(0)} stroke={COLORS.rule} />
+		<line x1={px0} x2={px0} y1={py0} y2={py1} stroke={COLORS.rule} />
+		<polyline points={pts(data.x, pred, sx, sy)} fill="none" stroke={COLORS.dmd} stroke-width="2" />
+		{data.x.map((x, i) => <circle cx={sx(x)} cy={sy(ref[i])} r="3" fill="#fff" stroke={COLORS.solver} stroke-width="1.5" />)}
+		<text x={px0 - 5} y={sy(0) + 4} font-size="10" fill={COLORS.muted} text-anchor="end">0</text>
+		<text x={px0 - 5} y={sy(1) + 4} font-size="10" fill={COLORS.muted} text-anchor="end">1</text>
+		<text x={(px0 + px1) / 2} y="206" font-size="10" fill={COLORS.muted} text-anchor="middle">x（n = 30）</text>
+		<g font-size="11" fill={COLORS.text}>
+			<line x1="540" x2="560" y1="226" y2="226" stroke={COLORS.dmd} stroke-width="2" />
+			<text x="565" y="230">Wⁿ u⁰</text>
+			<circle cx="628" cy="226" r="3" fill="#fff" stroke={COLORS.solver} stroke-width="1.5" />
+			<text x="636" y="230">陽解法</text>
+		</g>
+	</g>
+</svg>
