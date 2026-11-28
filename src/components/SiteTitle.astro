@@ -1,0 +1,194 @@
+---
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+
+// サイドバーが出る幅（50rem 以上）でだけ、サイドバーを隠すボタンを置く。
+// 状態は <html data-sidebar-hidden> で表し、描画前の当てかたは astro.config.mjs の head にある
+const { hasSidebar, lang } = Astro.locals.starlightRoute;
+const label = lang === 'ja' ? 'ノートの一覧' : 'Note list';
+---
+
+{
+	hasSidebar && (
+		<button
+			type="button"
+			class="sidebar-toggle print:hidden"
+			aria-label={label}
+			title={label}
+			aria-controls="starlight__sidebar"
+			aria-expanded="true"
+		>
+			<svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none">
+				<rect x="2.5" y="3.5" width="15" height="13" rx="2" stroke="currentColor" stroke-width="1.5" />
+				<path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.5" />
+				<path class="pane" d="M4 5h3.5v10H4z" fill="currentColor" />
+			</svg>
+		</button>
+	)
+}
+<Default />
+
+<script>
+	const KEY = 'sidebar-hidden';
+	const root = document.documentElement;
+	const button = document.querySelector<HTMLButtonElement>('.sidebar-toggle');
+	const sync = () => button?.setAttribute('aria-expanded', String(!root.hasAttribute('data-sidebar-hidden')));
+	sync();
+
+	// 本文と右の目次は、組み直すと題や段落の折り返しが変わり、縦の位置が変わる。
+	// そこで薄く消えるまで元の組み方にとどめ（data-sidebar-hold、theme.css）、行き先の組み方で薄く現れる。
+	// 組み直しは見えない間に一度だけ起きる。ヘッダーの検索欄は大きさが変わらないので、位置の差を transform で埋める
+	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+	const SLIDE = 12; // 消える・現れるときの横の滑り（px）
+	const OUT = 0.4; // 全体の時間のうち、消える側の割合
+	let fades: Animation[] = [];
+	let slides: Animation[] = [];
+	let turn = 0;
+
+	button?.addEventListener('click', () => {
+		const style = getComputedStyle(root);
+		// CSS の圧縮で 240ms が .24s になるので、単位を見て ms にする
+		const time = style.getPropertyValue('--sidebar-duration').trim();
+		const duration = (parseFloat(time) || 0) * (time.endsWith('ms') ? 1 : 1000);
+		const easing = style.getPropertyValue('--sidebar-easing').trim() || 'ease-out';
+		const animate = !reduceMotion.matches && duration > 0;
+		const panes = ['.main-pane', '.right-sidebar'].flatMap((s) => document.querySelector<HTMLElement>(s) ?? []);
+		const search = document.querySelector<HTMLElement>('.header site-search [data-open-modal]');
+
+		// 途中で押されたときは、いま見えている濃さ・位置・組み方から続ける
+		const seen = panes[0] && getComputedStyle(panes[0]);
+		const opacity = seen ? Number(seen.opacity) : 1;
+		const dx = seen && seen.transform !== 'none' ? new DOMMatrix(seen.transform).m41 : 0;
+		const searchFrom = search?.getBoundingClientRect().left ?? 0;
+		const shownLayout = root.getAttribute('data-sidebar-hold') ?? (root.hasAttribute('data-sidebar-hidden') ? 'hidden' : 'open');
+		[...fades, ...slides].forEach((a) => a.cancel());
+		fades = [];
+		slides = [];
+		const current = ++turn;
+
+		const hidden = root.toggleAttribute('data-sidebar-hidden');
+		root.toggleAttribute('data-sidebar-animating', animate);
+		if (animate && shownLayout !== (hidden ? 'hidden' : 'open')) root.setAttribute('data-sidebar-hold', shownLayout);
+		else root.removeAttribute('data-sidebar-hold');
+
+		if (animate) {
+			const shift = hidden ? -SLIDE : SLIDE; // 本文が動く向き（隠すと左、戻すと右）
+			const fade = (keyframes: Keyframe[], timing: KeyframeAnimationOptions) => {
+				const list = panes.map((el) => el.animate(keyframes, timing));
+				fades.push(...list);
+				return Promise.all(list.map((a) => a.finished));
+			};
+			const fadeIn = (from: number, x: number) =>
+				fade(
+					[
+						{ opacity: from, transform: `translateX(${x}px)` },
+						{ opacity: 1, transform: 'none' },
+					],
+					{ duration: duration * (1 - OUT), easing, fill: 'backwards' },
+				);
+			const shown = root.hasAttribute('data-sidebar-hold')
+				? fade(
+						[
+							{ opacity, transform: `translateX(${dx}px)` },
+							{ opacity: 0, transform: `translateX(${shift}px)` },
+						],
+						{ duration: duration * OUT * opacity, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' },
+					).then(() => {
+						if (current !== turn) throw new Error('superseded');
+						// 消えきったコマで、行き先の組み方にして現れ始める
+						root.removeAttribute('data-sidebar-hold');
+						const out = fades;
+						fades = [];
+						const next = fadeIn(0, -shift);
+						out.forEach((a) => a.cancel());
+						return next;
+					})
+				: // 行き先の組み方がもう見えている（消える途中で押し戻した）ので、そのまま濃くする
+					fadeIn(opacity, dx);
+			if (search) {
+				const to = search.getBoundingClientRect().left;
+				if (Math.abs(searchFrom - to) > 0.5) {
+					slides.push(
+						search.animate([{ transform: `translateX(${searchFrom - to}px)` }, { transform: 'none' }], {
+							duration,
+							easing,
+						}),
+					);
+				}
+			}
+			// サイドバー自体の遷移（theme.css の --sidebar-shown）も含め、全部が止まったら片付ける
+			style.getPropertyValue('--sidebar-shown');
+			const sidebar = root.getAnimations();
+			Promise.all([shown, ...[...slides, ...sidebar].map((a) => a.finished)]).then(
+				() => {
+					if (current !== turn) return;
+					root.removeAttribute('data-sidebar-animating');
+					fades = [];
+					slides = [];
+				},
+				() => {},
+			);
+		}
+		try {
+			if (hidden) localStorage.setItem(KEY, '1');
+			else localStorage.removeItem(KEY);
+		} catch {}
+		sync();
+	});
+</script>
+
+<style>
+	.sidebar-toggle {
+		display: none;
+	}
+	@media (min-width: 50rem) {
+		.sidebar-toggle {
+			display: inline-flex;
+			flex-shrink: 0;
+			align-items: center;
+			justify-content: center;
+			width: 2.25rem;
+			height: 2.25rem;
+			margin-inline-end: 0.5rem;
+			padding: 0;
+			border: 0;
+			border-radius: 0.375rem;
+			background: transparent;
+			color: var(--sl-color-accent);
+			cursor: pointer;
+		}
+		.sidebar-toggle:hover {
+			background-color: var(--sl-color-gray-6);
+		}
+		.sidebar-toggle:focus-visible {
+			outline: 2px solid var(--sl-color-accent);
+			outline-offset: 1px;
+		}
+		/* 状態は描画前に当たる <html data-sidebar-hidden> で見る（開いた直後に動かさない） */
+		.pane {
+			transform-box: fill-box;
+			transform-origin: left center;
+		}
+		:global(:root[data-sidebar-hidden]) .sidebar-toggle {
+			color: var(--sl-color-gray-3);
+		}
+		:global(:root[data-sidebar-hidden]) .sidebar-toggle:hover {
+			color: var(--sl-color-white);
+		}
+		:global(:root[data-sidebar-hidden]) .pane {
+			transform: scaleX(0);
+			opacity: 0;
+		}
+	}
+	@media (min-width: 50rem) and (prefers-reduced-motion: no-preference) {
+		.sidebar-toggle {
+			transition:
+				color var(--sidebar-duration) var(--sidebar-easing),
+				background-color 120ms;
+		}
+		.pane {
+			transition:
+				transform var(--sidebar-duration) var(--sidebar-easing),
+				opacity var(--sidebar-duration) var(--sidebar-easing);
+		}
+	}
+</style>

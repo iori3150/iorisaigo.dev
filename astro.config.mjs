@@ -46,6 +46,12 @@ export default defineConfig({
 			pagination: false,
 			credits: false,
 			head: [
+				// サイドバーを隠した状態を、描画前に当てる（ボタンは src/components/SiteTitle.astro）
+				{
+					tag: 'script',
+					content:
+						"try{if(localStorage.getItem('sidebar-hidden')==='1')document.documentElement.setAttribute('data-sidebar-hidden','')}catch(e){}",
+				},
 				{ tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
 				{ tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: true } },
 				{
@@ -59,6 +65,7 @@ export default defineConfig({
 			customCss: ['katex/dist/katex.min.css', './src/styles/theme.css'],
 			components: {
 				Footer: './src/components/Footer.astro',
+				SiteTitle: './src/components/SiteTitle.astro',
 				ThemeProvider: './src/components/ThemeProvider.astro',
 				ThemeSelect: './src/components/ThemeSelect.astro',
 			},
